@@ -1,0 +1,51 @@
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Python
+__pycache__/
+*.py[cod]
+*.ipynb_checkpoints
+
+# Shell and general outputs
+*.log
+*.out
+*.err
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Bioinformatics file types
+*.bam
+*.bai
+*.sam
+*.vcf
+*.vcf.gz
+*.fasta
+*.fa
+*.fna
+*.fastq
+*.fq
+*.gff
+*.gtf
+*.bed
+*.idx
+*.tbi
+*.gz
+*.zip
+*.tar
+*.tar.gz
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Conda and virtual environments
+.env/
+.venv/
+*.conda
+*.env
