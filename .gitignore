@@ -1,6 +1,8 @@
 # # Ignore raw data and results folders in chapter directories
+chapter1_rnaseq/data/
 chapter1_rnaseq/raw_data/
 chapter1_rnaseq/results/
+chapter2_wgs/data/
 chapter2_wgs/raw_data/
 chapter2_wgs/results/
 
