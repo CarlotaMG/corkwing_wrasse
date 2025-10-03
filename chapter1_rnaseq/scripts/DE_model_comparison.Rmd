@@ -1,0 +1,315 @@
+---
+title: "Model Comparison and Transcript Extraction for Tier 2"
+author: "Carlota Myhre de Gouveia"
+date: "2025-10-03"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Model comparison via likelihood ratio tests (LRTs)
+
+## Setup and load required libraries
+```{r packages, results='hide'}
+# Set root directory
+here::i_am("scripts/DE_model_comparison.Rmd")
+
+# Load libraries 
+suppressPackageStartupMessages({
+  library(DESeq2)
+  library(tidyverse)
+  library(dplyr)
+  library(UpSetR)
+  library(here)
+  library(ggplot2)
+  library(variancePartition)
+  library(BiocParallel)
+  library(limma)
+})
+```
+
+## Data Import and Preprocessing
+```{r load_data}
+# Load transcript abundance matrix 
+abundance_matrix <- read.table(here::here("data", "DE", "abundance_matrix.txt"), header = TRUE, row.names = 1, check.names = FALSE)
+head(abundance_matrix)
+
+# Load sample metadata
+sample_info <- read.table(here::here("data", "DE", "samples.txt"), header = FALSE, col.names = c("condition", "sample"))
+
+# Parse temperature and origin from condition
+sample_info <- sample_info %>%
+  mutate(
+    origin = substr(condition, 1, 1),
+    temperature = substr(condition, 2, nchar(condition))
+  ) %>%
+  mutate(
+    origin = recode(origin, "W" = "West", "H" = "Hybrid", "S" = "South"),
+    temperature = factor(temperature, levels = c("12", "15", "18")),
+    origin = factor(origin)
+  )
+sample_info
+```
+
+## Prepare abundance matrix
+```{r prep_abundance_matrix}
+# Match column names 
+colnames(abundance_matrix) <- sample_info$sample
+
+# Ensure non-negative integer count
+abundance_matrix <- round(pmax(abundance_matrix, 0))  
+
+# Keep transcripts with total count ≥ 10 across all samples
+keep_transcripts <- rowSums(abundance_matrix) >= 10
+abundance_matrix <- abundance_matrix[keep_transcripts, ]
+```
+
+## Create DESeq2 datasets for each model
+```{r define_model_datasets}
+# Define condition model
+dds_condition <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ condition)
+
+# Define additive model
+dds_additive <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ temperature + origin)
+
+# Define interaction model
+dds_interaction <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ temperature * origin)
+```
+
+## Run DESeq2 for full model
+```{r run_DESeq2}
+dds_interaction <- DESeq(dds_interaction)
+```
+
+## Compare interaction vs additive model
+```{r ltr_interaction_vs_additive}
+dds_lrt_inter_vs_add <- DESeq(dds_interaction, test = "LRT", reduced = ~ temperature + origin)
+res_inter_vs_add <- results(dds_lrt_inter_vs_add, alpha = 0.05)
+summary(res_inter_vs_add)
+```
+
+## Extract transcripts with significant interaction effects for Tier 2. These are candidates for origin-specific temperature responses.
+```{r extract_interaction_transcripts_for_tier2}
+
+# Filter transcripts with adjusted p-value < 0.05 from the LRT
+interaction_transcripts <- rownames(res_inter_vs_add)[which(res_inter_vs_add$padj < 0.05)]
+
+# Save to file for use in additive model DE script (Tier 2 overlap)
+write.csv(
+  data.frame(transcript_id = interaction_transcripts),
+  here::here("results", "DE", "interaction_effects", "significant_interaction_transcripts.csv"),
+  row.names = FALSE
+)
+
+# Print number of transcripts
+cat("Number of transcripts with significant interaction effects:", length(interaction_transcripts), "\n")
+```
+
+## Compare condition vs null model
+```{r ltr_condition_vs_null}
+dds_condition <- DESeq(dds_condition)
+dds_lrt_cond_vs_null <- DESeq(dds_condition, test = "LRT", reduced = ~ 1)
+res_cond_vs_null <- results(dds_lrt_cond_vs_null, alpha = 0.05)
+summary(res_cond_vs_null)
+```
+
+## Compare additive vs null model
+```{r ltr_additive_vs_null}
+dds_additive <- DESeq(dds_additive)
+dds_lrt_add_vs_null <- DESeq(dds_additive, test = "LRT", reduced = ~ 1)
+res_add_vs_null <- results(dds_lrt_add_vs_null, alpha = 0.05)
+summary(res_add_vs_null)
+```
+
+## Compare interaction vs null model
+```{r ltr_interaction_vs_null}
+dds_lrt_inter_vs_null <- DESeq(dds_interaction, test = "LRT", reduced = ~ 1)
+res_inter_vs_null <- results(dds_lrt_inter_vs_null, alpha = 0.05)
+summary(res_inter_vs_null)
+```
+
+
+## Visualize results
+```{r model_overlap}
+
+# Create list of significant transcripts from each comparison
+listInput <- list(
+  Inter_vs_Add = rownames(res_inter_vs_add)[which(res_inter_vs_add$padj < 0.05)],
+  Cond_vs_Null = rownames(res_cond_vs_null)[which(res_cond_vs_null$padj < 0.05)],
+  Add_vs_Null = rownames(res_add_vs_null)[which(res_add_vs_null$padj < 0.05)],
+  Inter_vs_Null = rownames(res_inter_vs_null)[which(res_inter_vs_null$padj < 0.05)]
+)
+
+# UpSet plot
+upset(fromList(listInput), order.by = "freq", main.bar.color = "steelblue")
+
+# Intersection table
+all_transcripts <- unique(unlist(listInput))
+presence_df <- tibble(
+  transcript = all_transcripts,
+  Inter_vs_Add = all_transcripts %in% listInput$Inter_vs_Add,
+  Cond_vs_Null = all_transcripts %in% listInput$Cond_vs_Null,
+  Add_vs_Null = all_transcripts %in% listInput$Add_vs_Null,
+  Inter_vs_Null = all_transcripts %in% listInput$Inter_vs_Null
+)
+
+summary_table <- presence_df %>%
+  group_by(Inter_vs_Add, Cond_vs_Null, Add_vs_Null, Inter_vs_Null) %>%
+  summarise(TranscriptCount = n(), .groups = "drop") %>%
+  arrange(desc(TranscriptCount))
+
+print(summary_table)
+
+# Totals for each model
+totals_table <- tibble(
+  Model = c("Interaction vs Additive", "Condition vs Null", "Additive vs Null", "Interaction vs Null"),
+  SignificantTranscripts = c(
+    length(listInput$Inter_vs_Add),
+    length(listInput$Cond_vs_Null),
+    length(listInput$Add_vs_Null),
+    length(listInput$Inter_vs_Null)
+  )
+)
+
+print(totals_table)
+
+```
+
+# Variance partition
+
+## Setup and shared data
+```{r setup_variance_partition}
+# Register parallel backend 
+register(SnowParam(4))  
+
+# Use variance-stabilized counts 
+vsd <- vst(dds_interaction, blind = FALSE)
+expr_matrix <- assay(vsd)
+metadata <- as.data.frame(colData(vsd))
+
+# Filter out low-variance transcripts
+expr_filtered <- expr_matrix[rowVars(expr_matrix) > 0.1, ]
+
+# Ensure factors
+metadata$origin <- factor(metadata$origin)
+metadata$temperature <- factor(metadata$temperature)
+
+# Set the rownames of sample_info to match the expression matrix for variance partition on the condition model
+rownames(sample_info) <- sample_info$sample
+
+```
+
+## Check number of filtered transcripts
+```{r check_filtering}
+# Number of transcripts before filtering
+n_before <- nrow(expr_matrix)
+
+# Number of transcripts after filtering
+n_after <- nrow(expr_filtered)
+
+# Number of transcripts removed
+n_removed <- n_before - n_after
+
+cat("Transcripts before filtering:", n_before, "\n")
+cat("Transcripts after filtering:", n_after, "\n")
+cat("Transcripts removed:", n_removed, "\n")
+
+```
+
+## Variance partition and plotting
+```{r run_and_plot_variance_partition}
+
+# Run variance partitioning
+form_condition <- ~ (1|condition)
+form_additive <- ~ (1|origin) + (1|temperature)
+form_interaction <- ~ (1|origin) + (1|temperature) + (1|origin:temperature)
+
+
+varPart_condition <- fitExtractVarPartModel(expr_filtered, form_condition, sample_info)
+varPart_additive <- fitExtractVarPartModel(expr_filtered, form_additive, metadata)
+varPart_interaction <- fitExtractVarPartModel(expr_filtered, form_interaction, metadata)
+
+
+# Plot 1: Condition model
+plotVarPart(varPart_condition) +
+  theme_minimal(base_size = 14) +
+  ggtitle("Variance Partitioning - Condition Model")
+
+# Plot 2: Additive model
+plotVarPart(varPart_additive) +
+  theme_minimal(base_size = 14) +
+  ggtitle("Variance Partitioning - Additive Model")
+
+# Plot 3: Interaction model
+plotVarPart(varPart_interaction) +
+  theme_minimal(base_size = 14) +
+  ggtitle("Variance Partitioning - Interaction Model")
+
+# Convert to data frames and add model labels
+vp_add <- as.data.frame(varPart_additive) %>% mutate(Model = "Additive")
+vp_int <- as.data.frame(varPart_interaction) %>% mutate(Model = "Interaction")
+vp_cond <- as.data.frame(varPart_condition) %>% mutate(Model = "Condition")
+
+# Combine and reshape
+vp_combined <- bind_rows(vp_add, vp_int, vp_cond) %>%
+  pivot_longer(cols = -Model, names_to = "Factor", values_to = "Variance") %>%
+  filter(is.finite(Variance))
+
+# Plot 4a: Boxplot comparison
+ggplot(vp_combined, aes(x = Factor, y = Variance, fill = Model)) +
+  geom_boxplot(outlier.size = 0.5) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Variance Explained by Factor: All Models")
+
+# Plot 4b: Violin plot comparison 
+ggplot(vp_combined, aes(x = Factor, y = Variance, fill = Model)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Variance Distribution by Factor: All Models")
+
+
+```
+
+# MDS Plot: Sample Clustering
+```{r mds_plot, fig.width=8, fig.height=6}
+# Compute Euclidean distance matrix
+dist_matrix <- dist(t(assay(vsd)))  # transpose so samples are rows
+
+# Perform classical MDS
+mds_coords <- cmdscale(dist_matrix, k = 2)
+mds_df <- as.data.frame(mds_coords)
+colnames(mds_df) <- c("MDS1", "MDS2")
+mds_df$Sample <- colnames(vsd)
+mds_df <- cbind(mds_df, as.data.frame(colData(vsd)))
+
+# Plot MDS with color by Temperature and shape by Origin
+ggplot(mds_df, aes(x = MDS1, y = MDS2, color = factor(temperature), shape = factor(origin))) +
+  geom_point(size = 3) +
+  labs(
+    title = "MDS Plot of Trinity-derived Counts",
+    color = "Temperature",
+    shape = "Origin"
+  ) +
+  theme_minimal(base_size = 14)
+
+# Save to file
+ggsave(
+  filename = here::here("results", "sample_clustering", "MDS", "MDS_plot.png"),
+  width = 8, height = 6, dpi = 300
+)
+```
+# Summary
+
+This script compares condition, additive, and interaction models using variance partitioning and LRTs to evaluate differential expression patterns in *Symphodus melops*. The condition model explained the highest proportion of variance, reflecting its flexibility in treating each origin-temperature combination as a distinct group. However, this structure does not share information across conditions and is prone to overfitting, especially with limited replication.
+In contrast, the additive model explained substantial variance, particularly for temperature, and identified the largest number of significantly differentially expressed transcripts. This is supported by the MDS plot, which shows that samples primarily cluster by temperature, with less separation by origin — reinforcing the additive model’s ability to capture the dominant biological signal.
+LRT comparing the interaction model to the additive model revealed that only 741 transcripts (~0.4%) showed significantly improved fit when including the interaction term. These transcripts were considered candidates for origin-dependent temperature responses and were extracted for downstream analysis. Based on these results, the additive model was selected for global differential expression analysis.
+
+# Session Info
+```{r session_info} 
+sessionInfo()
+```
