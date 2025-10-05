@@ -1508,7 +1508,7 @@ div.tocify {
 <h1>Differential Expression Analysis with additive model</h1>
 <div id="setup-and-package-loading" class="section level2">
 <h2>Setup and Package Loading</h2>
-<pre class="r"><code># Set project root directory
+<pre class="r"><code># Set root directory
 here::i_am(&quot;scripts/additive_DE.Rmd&quot;)
 
 # Load necessary packages
@@ -1711,12 +1711,21 @@ temperature_levels &lt;- levels(sample_info$temperature)
 temperature_contrasts &lt;- t(combn(temperature_levels, 2))
 colnames(temperature_contrasts) &lt;- c(&quot;condition1&quot;, &quot;condition2&quot;)
 temperature_contrasts &lt;- as.data.frame(temperature_contrasts)
-
-# Origin contrasts (across all temperatures)
+temperature_contrasts</code></pre>
+<pre><code>##   condition1 condition2
+## 1         12         15
+## 2         12         18
+## 3         15         18</code></pre>
+<pre class="r"><code># Origin contrasts (across all temperatures)
 origin_levels &lt;- levels(sample_info$origin)
 origin_contrasts &lt;- t(combn(origin_levels, 2))
 colnames(origin_contrasts) &lt;- c(&quot;condition1&quot;, &quot;condition2&quot;)
-origin_contrasts &lt;- as.data.frame(origin_contrasts)</code></pre>
+origin_contrasts &lt;- as.data.frame(origin_contrasts)
+origin_contrasts</code></pre>
+<pre><code>##   condition1 condition2
+## 1     Hybrid      South
+## 2     Hybrid       West
+## 3      South       West</code></pre>
 </div>
 <div id="helper-function-to-check-if-a-contrast-corresponds-to-a-direct-coefficient-in-the-deseq2-model." class="section level2">
 <h2>Helper function to check if a contrast corresponds to a direct coefficient in the DESeq2 model.</h2>
@@ -2032,10 +2041,10 @@ write.csv(
 ## 1 Tier 1         585
 ## 2 Tier 2          32</code></pre>
 </div>
-<div id="summary" class="section level2">
-<h2>Summary</h2>
-<p>This script performs Tier 1 and Tier 2 differential expression analyses using an additive DESeq2 model to investigate temperature responses and local adaptation in <em>Symphodus melops</em>. Pairwise temperature contrasts revealed 585 transcripts consistently regulated by temperature across all origins (Tier 1). For Tier 2, constitutive origin differences were defined using South vs West origin fish, and their overlap with transcripts showing origin-dependent temperature responses yielded 32 strong candidates for local adaptation. These transcript sets were extracted and saved for downstream functional enrichment.</p>
 </div>
+<div id="summary" class="section level1">
+<h1>Summary</h1>
+<p>This script performs Tier 1 and Tier 2 differential expression analyses using an additive DESeq2 model to investigate temperature responses and local adaptation in <em>Symphodus melops</em>. Pairwise temperature contrasts revealed 585 transcripts consistently regulated by temperature across all origins (Tier 1). For Tier 2, constitutive origin differences were defined using West vs South origin fish, and their overlap with transcripts showing origin-dependent temperature responses yielded 32 strong candidates for local adaptation. These transcript sets were extracted and saved for downstream functional enrichment.</p>
 </div>
 <div id="session-info" class="section level1">
 <h1>Session Info</h1>
