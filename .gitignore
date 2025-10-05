@@ -2,9 +2,11 @@
 chapter1_rnaseq/data/
 chapter1_rnaseq/raw_data/
 chapter1_rnaseq/results/
+chapter1_rnaseq/jobs/
 chapter2_wgs/data/
 chapter2_wgs/raw_data/
 chapter2_wgs/results/
+chapter2_wgs/jobs/
 
 # History files
 .Rhistory
