@@ -85,12 +85,11 @@ dds <- DESeq(dds)
 # Extract coefficient names for downstream contrasts
 coef_names <- resultsNames(dds)
 
-
-
 # Plot dispersion estimates across transcripts to assess fit to the negative binomial model used by DESeq2
 plotDispEsts(dds)
 
 ```
+
 ## Define contrasts
 ```{r define_contrasts}
 
@@ -107,9 +106,6 @@ origin_contrasts <- t(combn(origin_levels, 2))
 colnames(origin_contrasts) <- c("condition1", "condition2")
 origin_contrasts <- as.data.frame(origin_contrasts)
 origin_contrasts
-
-
-
 ```
 
 ## Helper function to check if a contrast corresponds to a direct coefficient in the DESeq2 model.
@@ -239,6 +235,7 @@ write.csv(
   row.names = FALSE
 )
 ```
+
 
 # Venn diagrams
 
@@ -394,7 +391,7 @@ write.csv(
 
 Tier 2 aims to identify transcripts that may be involved in **local adaptation** between corkwing wrasse populations. These candidates are defined by the **overlap between constitutive differences and interaction effects**:
 
-- **Constitutive differences** are identified using the additive model (`~ origin + temperature`) by comparing origins (e.g., West vs South) while controlling for temperature. These represent **baseline expression differences** that are consistent across temperatures and may reflect fixed genetic divergence.
+- **Constitutive differences** are identified using the additive model (`~ origin + temperature`) by comparing origins (West vs South) while controlling for temperature. These represent **baseline expression differences** that are consistent across temperatures and may reflect fixed genetic divergence.
 
 - **Interaction effects** are identified using a likelihood ratio test (LRT) comparing models with and without the `origin:temperature` interaction term. These transcripts show **origin-specific responses to temperature**, indicating **plasticity divergence**.
 
