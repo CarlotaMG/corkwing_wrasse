@@ -3,7 +3,7 @@
 input="$1"
 basename=$(basename "$input" .bed)
 output="${2:-${basename}_summary.tsv}"
-threshold="${3:-90}"
+threshold="${3:-0}"
 
 mkdir -p "$(dirname "$output")"
 
