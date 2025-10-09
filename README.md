@@ -17,7 +17,7 @@ It includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
  
-See the Chapter 1 README for full details.
+See the Chapter 1[README](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/README.md) for full details.
 
 ---
 
