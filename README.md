@@ -6,7 +6,7 @@ This repository accompanies a PhD project focused on the genomics and transcript
 
 ## Chapter 1: Temperature-Dependent Gene Expression
 
-This chapter investigates gene expression responses to temperature across pedigrees (southern, western, and hybrid origins in Norway) using RNA-seq data. 
+This chapter explores gene expression responses to temperature in Symphodus melops from southern and western Norwegian populations and their hybrids, based on RNA-seq data from fish exposed to three temperature conditions.
 It includes:
 
 - Guided de novo transcriptome assembly using Trinity
