@@ -1,11 +1,6 @@
-# corkwing_wrasse
+# Chapter 1: Transcriptome assembly and temperature-dependent gene expression
 
-This repository accompanies a PhD project focused on the genomics and transcriptomics of the corkwing wrasse (*Symphodus melops*), a temperate marine fish. 
-
-
-## Chapter 1: Transcriptome assembly and temperature-dependent gene expression
-
-This chapter focuses on the de novo transcriptome assembly and transcriptomic responses to temperature treatments in *Symphodus melops*. 
+This chapter focuses on de novo transcriptome assembly and temperature-dependent gene expression in *Symphodus melops* from southern and western origins and their hybrids, based on RNA-seq data. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, and hybrid misregulation. 
 
 Transcript extraction is organized into three tiers to capture different aspects of temperature response and divergence:
 
