@@ -23,17 +23,17 @@ This chapter includes:
 
 ### Transcriptome assembly
 #### Preprocessing and quality control:
-#### [https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastaQC.sh](# fastaQC.sh)
+[https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastaQC.sh](# fastaQC.sh)
 Runs FastQC on paired-end FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
-Inputs:
+- Inputs: 
 Paired-end FASTQ files (*_paired.fastq.gz)
-Outputs: 
+- Outputs: 
 FastQC reports (*.html, *.zip)
-Usage:
+- Usage:
 bash fastaQC.sh <input_dir> <output_dir>
 
-Example:
+- Example:
 bash fastaQC.sh ../../data/raw_fastq ../../results/fastaQC/raw
 bash fastaQC.sh ../../data/trimmed_fastq ../../results/fastaQC/trimmed
 
