@@ -68,7 +68,8 @@ Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is design
 - *_R2_paired.fastq.gz
 - *_R2_unpaired.fastq.gz
 ##### Usage
-sbatch --array=<start>-<end> scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
+sbatch --array=0-<N> scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
+> Where `<N>` is the number of samples minus one (e.g., if you have 78 samples, use `--array=0-77`).
 ##### Example
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
