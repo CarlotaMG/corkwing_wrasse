@@ -18,6 +18,8 @@ This chapter includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
 
+## Working Directory
+All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 
 ## Scripts
 
@@ -33,14 +35,31 @@ Outputs: FastQC reports (*.html, *.zip)
 
 Usage:
 
-bash fastaQC.sh <input_dir> <output_dir>
+bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
 
 Examples:
 
-bash fastaQC.sh ../../data/raw_fastq ../../results/fastaQC/raw
+bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/raw
 
-bash fastaQC.sh ../../data/trimmed_fastq ../../results/fastaQC/trimmed
+bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
 
+[multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
+
+Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
+
+Inputs: Directory containing FastQC output files (*.zip, *.html)
+
+Outputs: MultiQC summary report (multiqc_report.html) and associated files
+
+Usage:
+
+bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
+
+Examples:
+
+bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multiQC/raw
+
+bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
 
 #### trinities_filter_by_gene_cov.sh
 
