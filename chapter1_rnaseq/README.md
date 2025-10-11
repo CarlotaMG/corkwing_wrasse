@@ -1,6 +1,6 @@
 # Chapter 1: Transcriptome assembly and temperature-dependent gene expression
 
-This chapter focuses on de novo transcriptome assembly and temperature-dependent gene expression in *Symphodus melops* from southern and western origins and their hybrids, based on RNA-seq data. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, and hybrid misregulation. 
+This chapter focuses on de novo transcriptome assembly and temperature-dependent gene expression in *Symphodus melops* from southern and western origins in Norway and their hybrids, based on RNA-seq data. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, and hybrid misregulation. 
 
 Transcript extraction is organized into three tiers to capture different aspects of temperature response and divergence:
 
@@ -18,7 +18,7 @@ This chapter includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
 
-**Working Directory**
+### Working Directory
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 
 ## Scripts
