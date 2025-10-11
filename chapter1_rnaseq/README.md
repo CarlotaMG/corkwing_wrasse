@@ -55,7 +55,7 @@ bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multi
 
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
 
-[trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preproces>
+[trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
 
 Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is designed to be executed as part of a SLURM array job and accepts three arguments: input directory, output directory, and adapter file.
 
