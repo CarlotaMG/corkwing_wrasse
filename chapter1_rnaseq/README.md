@@ -18,7 +18,23 @@ This chapter includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
 
-### Scripts
+## Scripts
+
+### Transcriptome assembly
+#### Preprocessing and quality control
+Runs FastQC on paired-end FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
+
+Inputs: Paired-end FASTQ files (*_paired.fastq.gz)
+Outputs: FastQC reports (*.html, *.zip)
+Script: scripts/assembly/preprocessing/fastaQC.sh
+
+Usage:
+bash fastaQC.sh <input_dir> <output_dir>
+
+Example:
+bash fastaQC.sh ../../data/raw_fastq ../../results/fastaQC/raw
+bash fastaQC.sh ../../data/trimmed_fastq ../../results/fastaQC/trimmed
+
 
 #### trinities_filter_by_gene_cov.sh
 
