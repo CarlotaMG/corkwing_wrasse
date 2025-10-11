@@ -27,12 +27,12 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 #### Preprocessing and quality control:
 [fastQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastaQC.sh)
 
-Runs FastQC on paired-end FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
+Runs FastQC on FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
 ##### Inputs
- Paired-end FASTQ files (*_paired.fastq.gz)
+FASTQ files 
 ##### Outputs
- FastQC reports (*.html, *.zip)
+FastQC reports (*.html, *.zip)
 ##### Usage
 bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
 ##### Examples
