@@ -1,6 +1,6 @@
 # Chapter 1: Transcriptome assembly and temperature-dependent gene expression
 
-This chapter focuses on de novo transcriptome assembly and temperature-dependent gene expression in *Symphodus melops* from southern and western origins in Norway and their hybrids, based on RNA-seq data. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, and hybrid misregulation. 
+This chapter focuses on transcriptome assembly and temperature-dependent gene expression in *Symphodus melops* from southern and western Norwegian populations and their hybrids, based on RNA-seq data. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, and hybrid misregulation. 
 
 Transcript extraction is organized into three tiers to capture different aspects of temperature response and divergence:
 
@@ -30,7 +30,6 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 Runs FastQC on paired-end FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
 Inputs: Paired-end FASTQ files (*_paired.fastq.gz)
-
 Outputs: FastQC reports (*.html, *.zip)
 
 Usage:
@@ -48,7 +47,6 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQ
 Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
 
 Inputs: Directory containing FastQC output files (*.zip, *.html)
-
 Outputs: MultiQC summary report (multiqc_report.html) and associated files
 
 Usage:
