@@ -44,19 +44,33 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQ
 
 Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
 
-Inputs: Directory containing FastQC output files (*.zip, *.html)
-
-Outputs: MultiQC summary report (multiqc_report.html) and associated files
-
-Usage:
-
+##### Inputs
+Directory containing FastQC output files (*.zip, *.html)
+##### Outputs
+MultiQC summary report (multiqc_report.html) and associated files
+##### Usage
 bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
-
-Examples:
-
+#### Examples
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multiQC/raw
 
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
+
+[trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preproces>
+
+Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is designed to be executed as part of a SLURM array job and accepts three arguments: input directory, output directory, and adapter file.
+
+##### Inputs
+- Paired-end FASTQ files (*_R1.fastq.gz, *_R2.fastq.gz)
+- Adapter file (TruSeq3-PE.fa)
+##### Outputs
+- *_R1_paired.fastq.gz
+- *_R1_unpaired.fastq.gz
+- *_R2_paired.fastq.gz
+- *_R2_unpaired.fastq.gz
+##### Usage
+sbatch --array=<start>-<end> scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
+##### Example
+sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
 #### trinities_filter_by_gene_cov.sh
 
