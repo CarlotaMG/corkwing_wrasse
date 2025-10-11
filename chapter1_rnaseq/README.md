@@ -29,15 +29,13 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 
 Runs FastQC on paired-end FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
-Inputs: Paired-end FASTQ files (*_paired.fastq.gz)
-Outputs: FastQC reports (*.html, *.zip)
-
-Usage:
-
+##### Inputs
+ Paired-end FASTQ files (*_paired.fastq.gz)
+##### Outputs
+ FastQC reports (*.html, *.zip)
+##### Usage
 bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
-
-Examples:
-
+##### Examples
 bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/raw
 
 bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
@@ -47,6 +45,7 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQ
 Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
 
 Inputs: Directory containing FastQC output files (*.zip, *.html)
+
 Outputs: MultiQC summary report (multiqc_report.html) and associated files
 
 Usage:
