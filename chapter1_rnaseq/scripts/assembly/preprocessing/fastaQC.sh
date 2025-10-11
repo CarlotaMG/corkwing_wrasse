@@ -16,6 +16,6 @@ OUTPUT_DIR="$2"
 mkdir -p "$OUTPUT_DIR"
 
 # Run FastQC on all paired FASTQ files
-for file in "$INPUT_DIR"/*_paired.fastq.gz; do
+for file in "$INPUT_DIR"/*; do
     fastqc -t 4 -o "$OUTPUT_DIR" "$file"
 done

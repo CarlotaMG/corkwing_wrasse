@@ -30,7 +30,7 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 Runs FastQC on FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
 ##### Inputs
-FASTQ files 
+FASTQ files(*.fastq or *.fastq.gz) 
 ##### Outputs
 FastQC reports (*.html, *.zip)
 ##### Usage
