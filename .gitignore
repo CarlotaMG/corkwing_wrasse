@@ -90,6 +90,9 @@ __pycache__/
 *.tar
 *.tar.gz
 
+# Execptions
+!chapter1_rnaseq/resources/TruSeq3-PE.fa
+
 # System files
 .DS_Store
 Thumbs.db
