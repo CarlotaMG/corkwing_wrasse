@@ -75,7 +75,7 @@ This project uses the publicly available *Symphodus melops* reference genome (fS
 
 **Citation**:
 Howe *et al.* (2023). *The genome sequence of the corkwing wrasse, Symphodus melops*. *Wellcome Open Research*, 8:301. 
-https://doi.org/10.12688/wellcomeopenres.19184.1
+https://doi.org/10.12688/wellcomeopenres.19398.1
 
 **Data Access**:
 European Nucleotide Archive (ENA) Project: PRJEB58352
