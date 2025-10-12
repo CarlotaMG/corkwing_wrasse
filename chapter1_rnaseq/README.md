@@ -73,6 +73,51 @@ sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <o
 ##### Example
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
+#### Mapping:
+Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the reference genome to produce coordinate-sorted BAM files. Trinity uses these alignments to partition reads into genomic loci, which are then assembled independently using de novo methods. This approach improves transcript reconstruction by incorporating genomic context while maintaining the flexibility of de novo assembly, including the potential to recover novel or unannotated transcripts.
+
+[indexing.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/indexing.sh)
+
+Builds a STAR genome index from the reference genome. This index is required for mapping reads with STAR.
+
+##### Inputs
+- Reference genome FASTA file
+##### Outputs
+- STAR genome index files
+##### Usage
+bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
+##### Example
+bash scripts/assembly/mapping/indexing.sh data/ref_genome.fasta results/indexing
+
+[mapping.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/mapping.sh)
+
+Maps trimmed paired-end reads to the reference genome using STAR. This script loops through all samples in the input directory and produces sorted BAM files for each.
+
+##### Inputs
+- STAR genome index directory
+- Trimmed paired-end FASTQ files (*_R1_paired.fastq.gz, *_R2_paired.fastq.gz)
+##### Outputs
+- Sorted BAM files for each sample
+##### Usage
+bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
+##### Example
+bash scripts/assembly/mapping/mapping.sh results/indexing data/trimmed_fastq results/mapping
+
+[concatBAM.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/concatBAM.sh)
+
+Merges all individual BAM files from the mapping step into a single file for use in guided de novo Trinity assembly.
+
+##### Inputs
+- Directory containing sorted BAM files
+##### Outputs
+- Merged BAM file (combined_for_assembly.bam)
+##### Usage
+bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
+##### Example
+bash scripts/assembly/mapping/concatBAM.sh results/mapping results/mapping/combined_for_assembly.bam
+
+
+
 #### trinities_filter_by_gene_cov.sh
 
 This script filters Trinity-assembled transcripts based on their overlap with gene annotations from a custom GFF3 file (`fSymMel2.gff.gz`) for *Symphodus melops*.
