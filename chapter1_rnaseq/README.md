@@ -79,6 +79,8 @@ sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <o
 ##### Example
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
+⸺
+
 #### Mapping:
 Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the reference genome to produce coordinate-sorted BAM files. Trinity uses these alignments to partition reads into genomic loci, which are then assembled independently using de novo methods. This approach improves transcript reconstruction by incorporating genomic context while maintaining the flexibility of de novo assembly, including the potential to recover novel or unannotated transcripts.
 
