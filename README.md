@@ -67,3 +67,16 @@ corkwing_wrasse/
 ├── LICENSE              # MIT license
 └── README.md            # Project overview (this file)
 
+## Data Sources
+
+### Reference Genome
+
+This project uses the publicly available *Symphodus melops* reference genome (fSymMel2) from the [Darwin Tree of Life Project](httpsted by the Wellcome Sanger Institute. The genome is scaffolded into 23 chromosomal pseudomolecules and is used throughout the project for guided de novo transcriptome assembly, annotation, mapping, and integration with genomic analyses.
+
+**Citation**:
+Howe *et al.* (2023). *The genome sequence of the corkwing wrasse, Symphodus melops*. *Wellcome Open Research*, 8:301.
+🔗 https://doi.org/10.12688/wellcomeopenres.19184.1
+
+**Data Access**:
+European Nucleotide Archive (ENA) Project: PRJEB58352
+Genome Assembly Accession: CANSXB010000000
