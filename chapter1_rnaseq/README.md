@@ -43,6 +43,7 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/ra
 bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
 
 ⸺
+
 [multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
 
 Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
@@ -59,6 +60,7 @@ bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multi
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
 
 ⸺
+
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
 
 Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is designed to be executed as part of a SLURM array job and accepts three arguments: input directory, output directory, and adapter file.
@@ -96,6 +98,7 @@ bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
 bash scripts/assembly/mapping/indexing.sh data/ref_genome.fasta results/indexing
 
 ⸺
+
 [mapping.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/mapping.sh)
 
 Maps trimmed paired-end reads to the reference genome using STAR. This script loops through all samples in the input directory and produces sorted BAM files for each.
@@ -111,6 +114,7 @@ bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 bash scripts/assembly/mapping/mapping.sh results/indexing data/trimmed_fastq results/mapping
 
 ⸺
+
 [concatBAM.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/concatBAM.sh)
 
 Merges all individual BAM files from the mapping step into a single file for use in guided de novo Trinity assembly.
@@ -125,6 +129,7 @@ bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
 bash scripts/assembly/mapping/concatBAM.sh results/mapping results/mapping/combined_for_assembly.bam
 
 ⸺
+
 #### trinities_filter_by_gene_cov.sh
 
 This script filters Trinity-assembled transcripts based on their overlap with gene annotations from a custom GFF3 file (`fSymMel2.gff.gz`) for *Symphodus melops*.
