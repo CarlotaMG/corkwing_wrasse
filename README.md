@@ -67,7 +67,7 @@ corkwing_wrasse/
 ├── LICENSE              # MIT license
 └── README.md            # Project overview (this file)
 
-## Data Sources
+## Resources
 
 ### Reference Genome
 
