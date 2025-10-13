@@ -18,21 +18,48 @@ This chapter includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
 
+⸺
+
 ### Working Directory
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
+
+⸺
+
+### Singularity Container for Trinity and Trinotate
+To ensure reproducibility and consistent software environments, all steps related to transcriptome assembly and Trinotate-based annotation were performed within a Singularity container.
+
+This includes:
+- **Trinity v2.15.2** for guided de novo transcriptome assembly
+- **Trinotate v3.2.2** for functional annotation
+
+> **Note:** Downstream analyses (differential expression, clustering, genome-based GFF integration, functional enrichment) was performed outside the container in R environments.
+
+The container was pulled from Docker Hub using:
+
+singularity pull docker://trinityrnaseq/trinityrnaseq
+
+
+Scripts using Trinity or Trinotate are designed to run inside the container using:
+
+singularity exec --bind $(pwd):$(pwd) trinityrnaseq_latest.sif <command>
+
+For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq).
+
+---
 
 ## Scripts
 
 ### Transcriptome assembly
 #### Preprocessing and quality control:
+
 [fastQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastaQC.sh)
 
 Runs FastQC on FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
 
 ##### Inputs
-FASTQ files(*.fastq or *.fastq.gz) 
+- FASTQ files(*.fastq or *.fastq.gz) 
 ##### Outputs
-FastQC reports (*.html, *.zip)
+- FastQC reports (*.html, *.zip)
 ##### Usage
 bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
 ##### Examples
@@ -40,20 +67,22 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/ra
 
 bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
 
+
 [multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
 
 Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory containing FastQC output files.
 
 ##### Inputs
-Directory containing FastQC output files (*.zip, *.html)
+- Directory containing FastQC output files (*.zip, *.html)
 ##### Outputs
-MultiQC summary report (multiqc_report.html) and associated files
+- MultiQC summary report (multiqc_report.html) and associated files
 ##### Usage
 bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
 #### Examples
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multiQC/raw
 
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
+
 
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
 
@@ -76,6 +105,7 @@ sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq da
 #### Mapping:
 Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the reference genome to produce coordinate-sorted BAM files. Trinity uses these alignments to partition reads into genomic loci, which are then assembled independently using de novo methods. This approach improves transcript reconstruction by incorporating genomic context while maintaining the flexibility of de novo assembly, including the potential to recover novel or unannotated transcripts.
 
+
 [indexing.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/indexing.sh)
 
 Builds a STAR genome index from the reference genome. This index is required for mapping reads with STAR.
@@ -88,6 +118,7 @@ Builds a STAR genome index from the reference genome. This index is required for
 bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
 ##### Example
 bash scripts/assembly/mapping/indexing.sh data/ref_genome.fasta results/indexing
+
 
 [mapping.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/mapping.sh)
 
@@ -102,6 +133,7 @@ Maps trimmed paired-end reads to the reference genome using STAR. This script lo
 bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 ##### Example
 bash scripts/assembly/mapping/mapping.sh results/indexing data/trimmed_fastq results/mapping
+
 
 [concatBAM.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/concatBAM.sh)
 
