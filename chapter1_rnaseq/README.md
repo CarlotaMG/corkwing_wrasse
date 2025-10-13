@@ -25,6 +25,14 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 
 ⸺
 
+### Job Execution and SLURM Usage
+Most scripts in this repository are designed to run locally or on any Unix-based system without requiring SLURM. However, some computationally intensive steps — such as read trimming (`trimming.sh`), transcriptome assembly (`trinity_run.sh`), and annotation with Trinotate — may benefit from or require execution on a high-performance computing (HPC) system.
+Where applicable, SLURM-specific usage (e.g., `--array`, `--cpus-per-task`, `--mem`) is documented in the script sections or usage examples.
+
+> This flexible design allows users to reproduce the pipeline on both local machines and HPC environments, depending on available resources and dataset size.
+
+⸺
+
 ### Singularity Container for Trinity 
 To ensure reproducibility and consistent software environments, all steps related to transcriptome assembly were performed within a Singularity container.
 
@@ -64,9 +72,9 @@ Runs FastQC on FASTQ files to assess read quality. This script is parameterized 
 ##### Usage
 bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
 ##### Examples
-bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/raw
+bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/assembly/preprocessing/fastaQC/raw
 
-bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
+bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/assembly/preprocessing/fastaQC/trimmed
 
 ⸺
 
@@ -81,9 +89,9 @@ Aggregates FastQC reports into a single summary using MultiQC. This script is de
 ##### Usage
 bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
 #### Examples
-bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multiQC/raw
+bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/raw results/assembly/preprocessing/multiQC/raw
 
-bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
+bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/trimmed results/assembly/preprocessing/multiQC/trimmed
 
 ⸺
 
@@ -101,7 +109,7 @@ Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is design
 - *_R2_unpaired.fastq.gz
 ##### Usage
 sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
-> Where `<N>` is the number of samples minus one (e.g., if you have 78 samples, use `--array=0-77`).
+> Where `<N>` is the number of input FASTQ files minus one. For example, if you have 39 paired-end samples (78 FASTQ files total), use --array=0-77.
 ##### Example
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
@@ -121,7 +129,7 @@ Builds a STAR genome index from the reference genome. This index is required for
 ##### Usage
 bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
 ##### Example
-bash scripts/assembly/mapping/indexing.sh data/ref_genome.fasta results/indexing
+bash scripts/assembly/mapping/indexing.sh resources/ref_genome.fasta results/assembly/mapping/indexing
 
 ⸺
 
@@ -137,7 +145,7 @@ Maps trimmed paired-end reads to the reference genome using STAR. This script lo
 ##### Usage
 bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 ##### Example
-bash scripts/assembly/mapping/mapping.sh results/indexing data/trimmed_fastq results/mapping
+bash scripts/assembly/mapping/mapping.sh  results/assembly/mapping/indexing data/trimmed_fastq results/assembly/mapping
 
 ⸺
 
@@ -152,9 +160,32 @@ Merges all individual BAM files from the mapping step into a single file for use
 ##### Usage
 bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
 ##### Example
-bash scripts/assembly/mapping/concatBAM.sh results/mapping results/mapping/combined_for_assembly.bam
+bash scripts/assembly/mapping/concatBAM.sh results/assembly/mapping results/assembly/mapping/combined_for_assembly.bam
 
 ⸺
+
+#### Run Trinity Assembly:
+
+[trinity_run.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/trinity/trinity_run.sh)
+
+Runs genome-guided de novo transcriptome assembly inside a Singularity container. The script takes a coordinate-sorted BAM file, a Singularity image, and an output directory as input.
+
+##### Inputs
+- Coordinate-sorted BAM file (combined_for_assembly.bam)
+- Singularity image (trinityrnaseq_latest.sif)
+##### Outputs
+- Assembled transcriptome (Trinity-GG.fasta) and associated files for quantification and annotation
+##### Usage
+bash scripts/assembly/trinity/trinity_run.sh <bam_file> <singularity_image> <output_dir>
+##### Example
+bash scripts/assembly/trinity/trinity_run.sh results/mapping/combined_for_assembly.bam resources/trinityrnaseq_latest.sif results/assembly/trinity
+
+> **Note:** Trinity was run in genome-guided mode with --genome_guided_max_intron 20000.
+The Butterfly stage (--bflyHeapSpaceMax 10G) uses 10 GB per thread, multiplied by 16 threads (--bflyCPU 16), totaling 160 GB — consistent with the overall memory setting (--max_memory 160G).
+To accommodate this, the script was executed via a SLURM job with --cpus-per-task=16 and a slightly higher memory allocation (--mem=170G) to ensure stability and account for container-related overhead.
+
+
+
 
 #### trinities_filter_by_gene_cov.sh
 
