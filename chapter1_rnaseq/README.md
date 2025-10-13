@@ -67,6 +67,7 @@ bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/fastaQC/ra
 
 bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/fastaQC/trimmed
 
+⸺
 
 [multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
 
@@ -83,6 +84,7 @@ bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/raw results/multi
 
 bash scripts/assembly/preprocessing/multiQC.sh results/fastaQC/trimmed results/multiQC/trimmed
 
+⸺
 
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
 
@@ -102,9 +104,10 @@ sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <o
 ##### Example
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
 
+⸺
+
 #### Mapping:
 Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the reference genome to produce coordinate-sorted BAM files. Trinity uses these alignments to partition reads into genomic loci, which are then assembled independently using de novo methods. This approach improves transcript reconstruction by incorporating genomic context while maintaining the flexibility of de novo assembly, including the potential to recover novel or unannotated transcripts.
-
 
 [indexing.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/indexing.sh)
 
@@ -119,6 +122,7 @@ bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
 ##### Example
 bash scripts/assembly/mapping/indexing.sh data/ref_genome.fasta results/indexing
 
+⸺
 
 [mapping.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/mapping.sh)
 
@@ -134,6 +138,7 @@ bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 ##### Example
 bash scripts/assembly/mapping/mapping.sh results/indexing data/trimmed_fastq results/mapping
 
+⸺
 
 [concatBAM.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/concatBAM.sh)
 
@@ -148,7 +153,7 @@ bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
 ##### Example
 bash scripts/assembly/mapping/concatBAM.sh results/mapping results/mapping/combined_for_assembly.bam
 
-
+⸺
 
 #### trinities_filter_by_gene_cov.sh
 
@@ -222,7 +227,7 @@ The GFF annotation file was provided by a collaborator. The link to the pipeline
 
 Rendered HTML reports from Chapter 1 are available via:
 
-🔗 https://carlotamg.github.io/corkwing_wrasse/
+https://carlotamg.github.io/corkwing_wrasse/
 
 This page links to:
 
