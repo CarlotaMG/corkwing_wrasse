@@ -25,25 +25,26 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 
 ⸺
 
-### Singularity Container for Trinity and Trinotate
-To ensure reproducibility and consistent software environments, all steps related to transcriptome assembly and Trinotate-based annotation were performed within a Singularity container.
+### Singularity Container for Trinity 
+To ensure reproducibility and consistent software environments, all steps related to transcriptome assembly were performed within a Singularity container.
 
 This includes:
 - **Trinity v2.15.2** for guided de novo transcriptome assembly
-- **Trinotate v3.2.2** for functional annotation
 
-> **Note:** Downstream analyses (differential expression, clustering, genome-based GFF integration, functional enrichment) was performed outside the container in R environments.
+
+> **Note:** Downstream analyses (differential expression, clustering, genome-based GFF integration, functional enrichment) was performed outside the container in R environments. Trinotate-based annotation was performed using a separate container.
 
 The container was pulled from Docker Hub using:
 
 singularity pull docker://trinityrnaseq/trinityrnaseq
 
 
-Scripts using Trinity or Trinotate are designed to run inside the container using:
+Scripts using Trinity are designed to run inside the container using:
 
 singularity exec --bind $(pwd):$(pwd) trinityrnaseq_latest.sif <command>
 
-For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq).
+
+For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
 
 ---
 
