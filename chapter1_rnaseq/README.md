@@ -184,8 +184,48 @@ bash scripts/assembly/trinity/trinity_run.sh results/mapping/combined_for_assemb
 The Butterfly stage (--bflyHeapSpaceMax 10G) uses 10 GB per thread, multiplied by 16 threads (--bflyCPU 16), totaling 160 GB — consistent with the overall memory setting (--max_memory 160G).
 To accommodate this, the script was executed via a SLURM job with --cpus-per-task=16 and a slightly higher memory allocation (--mem=170G) to ensure stability and account for container-related overhead.
 
+⸺
 
+#### Post-assembly evaluation:
 
+[trinity_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/trinity_stats.sh)
+
+Generates basic statistics for the Trinity-assembled transcriptome using `TrinityStats.pl` inside a Singularity container. The script accepts three arguments: the Trinity FASTA file, the Singularity image, and the output file path.
+
+##### Inputs
+- Trinity-assembled transcriptome (Trinity-GG.fasta)
+- Singularity image (`trinityrnaseq_latest.sif`)
+##### Outputs
+- Trinity assembly statistics (`trinity_stats.txt`)
+##### Usage
+bash scripts/assembly/post_assembly/stats/trinity_stats.sh <trinity_fasta> <singularity_image> <output_file>
+##### Example
+bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
+  results/assembly/trinity/Trinity-GG.fasta \
+  resources/trinityrnaseq_latest.sif \
+  results/assembly/post_assembly/stats/trinity_stats.txt
+
+⸺
+
+[busco_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/busco_stats.sh)
+
+Assesses the completeness of the Trinity-assembled transcriptome using BUSCO v5.5.0. The script accepts three arguments: the input FASTA file, the name of a BUSCO lineage dataset, and the output directory. It changes into the output directory before execution to ensure all BUSCO outputs — including logs, downloads, and temporary files — are contained within that location.
+
+##### Inputs
+- Trinity-assembled transcriptome (Trinity-GG.fasta)
+- BUSCO lineage dataset (e.g., actinopterygii_odb10)
+- Output directory (e.g., results/assembly/post_assembly/stats/busco/)
+##### Outputs
+- Completeness metrics based on conserved orthologs, along with associated logs and intermediate files
+##### Usage
+bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir>
+##### Example
+bash scripts/assembly/post_assembly/stats/busco_stats.sh \
+  results/assembly/trinity/Trinity-GG.fasta \
+  actinopterygii_odb10 \
+  results/assembly/post_assembly/stats/busco
+
+⸺
 
 #### trinities_filter_by_gene_cov.sh
 
