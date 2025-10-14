@@ -12,15 +12,18 @@ INPUT_FASTA="$1"
 LINEAGE="$2"
 OUTPUT_DIR="$3"
 
-# Load BUSCO module 
+# Load BUSCO module
 module load BUSCO/5.5.0-foss-2022b
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-# Run BUSCO
-busco -i "$INPUT_FASTA" \
+# Change to output directory to contain all BUSCO artifacts
+cd "$OUTPUT_DIR" || exit
+
+# Run BUSCO using relative path to input FASTA
+busco -i "../../../../../$INPUT_FASTA" \
       -l "$LINEAGE" \
-      -o "$(basename "$OUTPUT_DIR")" \
+      -o busco \
       -m transcriptome \
-      --out_path "$OUTPUT_DIR"
+      --out_path .
