@@ -1,10 +1,8 @@
 # # Ignore raw data and results folders in chapter directories
 chapter1_rnaseq/data/
-chapter1_rnaseq/raw_data/
 chapter1_rnaseq/results/
 chapter1_rnaseq/jobs/
 chapter2_wgs/data/
-chapter2_wgs/raw_data/
 chapter2_wgs/results/
 chapter2_wgs/jobs/
 
@@ -89,6 +87,7 @@ __pycache__/
 *.zip
 *.tar
 *.tar.gz
+*.sif
 
 # Execptions
 !chapter1_rnaseq/resources/TruSeq3-PE.fa
