@@ -200,10 +200,7 @@ Generates basic statistics for the Trinity-assembled transcriptome using `Trinit
 ##### Usage
 bash scripts/assembly/post_assembly/stats/trinity_stats.sh <trinity_fasta> <singularity_image> <output_file>
 ##### Example
-bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
-  results/assembly/trinity/Trinity-GG.fasta \
-  resources/trinityrnaseq_latest.sif \
-  results/assembly/post_assembly/stats/trinity_stats.txt
+bash scripts/assembly/post_assembly/stats/trinity_stats.sh results/assembly/trinity/Trinity-GG.fasta resources/trinityrnaseq_latest.sif results/assembly/post_assembly/stats/trinity_stats.txt
 
 ⸺
 
@@ -220,10 +217,7 @@ Assesses the completeness of the Trinity-assembled transcriptome using BUSCO v5.
 ##### Usage
 bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir>
 ##### Example
-bash scripts/assembly/post_assembly/stats/busco_stats.sh \
-  results/assembly/trinity/Trinity-GG.fasta \
-  actinopterygii_odb10 \
-  results/assembly/post_assembly/stats/busco
+bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco
 
 ⸺
 
