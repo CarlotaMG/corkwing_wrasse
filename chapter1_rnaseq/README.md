@@ -26,7 +26,7 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 ⸺
 
 ### Job Execution and SLURM Usage
-Most scripts in this repository are modular and designed to run locally or on any Unix-based system. However, several computationally intensive steps — such as read trimming, transcriptome assembly, annotation, and quantification — are designed to run on high-performance computing (HPC) systems using SLURM, and may not be executable outside such environments without modification.
+Most scripts in this repository are modular and designed to run locally or on any Unix-based system. However, several computationally intensive steps — such as read trimming, transcriptome assembly and quantification — are designed to run on high-performance computing (HPC) systems using SLURM, and may not be executable outside such environments without modification.
 
 > SLURM job scripts used during analysis are not included in the repository to maintain clarity. Instead, modular scripts are documented with usage examples and can be integrated into SLURM workflows as needed.
 
