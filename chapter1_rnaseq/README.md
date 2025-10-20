@@ -26,10 +26,11 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 ⸺
 
 ### Job Execution and SLURM Usage
-Most scripts in this repository are designed to run locally or on any Unix-based system without requiring SLURM. However, some computationally intensive steps — such as read trimming (`trimming.sh`), transcriptome assembly (`trinity_run.sh`), and annotation with Trinotate — may benefit from or require execution on a high-performance computing (HPC) system.
-Where applicable, SLURM-specific usage (e.g., `--array`, `--cpus-per-task`, `--mem`) is documented in the script sections or usage examples.
+Most scripts in this repository are modular and designed to run locally or on any Unix-based system. However, several computationally intensive steps — such as read trimming, transcriptome assembly, annotation, and quantification — are designed to run on high-performance computing (HPC) systems using SLURM, and may not be executable outside such environments without modification.
 
-> This flexible design allows users to reproduce the pipeline on both local machines and HPC environments, depending on available resources and dataset size.
+> SLURM job scripts used during analysis are not included in the repository to maintain clarity. Instead, modular scripts are documented with usage examples and can be integrated into SLURM workflows as needed.
+
+This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
 
 ⸺
 
