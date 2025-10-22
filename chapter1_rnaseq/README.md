@@ -35,13 +35,8 @@ This design reflects the actual workflow used during analysis and supports repro
 ⸺
 
 ### Singularity Container for Trinity 
-To ensure reproducibility and consistent software environments, all steps related to transcriptome assembly were performed within a Singularity container.
-
-This includes:
-- **Trinity v2.15.2** for guided de novo transcriptome assembly
-
-
-> **Note:** Downstream analyses (differential expression, clustering, genome-based GFF integration, functional enrichment) was performed outside the container in R environments. Trinotate-based annotation was performed using a separate container.
+Transcriptome assembly steps were performed within a Singularity container to ensure reproducibility and consistent software environments. The container used during this analysis was pulled from Docker Hub (trinityrnaseq/trinityrnaseq) on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
+The container encapsulates all necessary dependencies for guided de novo transcriptome assembly. While individual package versions inside the container were not tracked, the container itself ensures a consistent and reproducible environment across systems.
 
 The container was pulled from Docker Hub using:
 
