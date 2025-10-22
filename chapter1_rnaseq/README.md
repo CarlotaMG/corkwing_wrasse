@@ -35,16 +35,17 @@ This design reflects the actual workflow used during analysis and supports repro
 ⸺
 
 ### Singularity Container for Trinity 
-Transcriptome assembly steps were performed within a Singularity container to ensure reproducibility and consistent software environments. The container used during this analysis was pulled from Docker Hub (trinityrnaseq/trinityrnaseq) on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
-The container encapsulates all necessary dependencies for guided de novo transcriptome assembly. While individual package versions inside the container were not tracked, the container itself ensures a consistent and reproducible environment across systems.
+Transcriptome assembly steps were performed within a Singularity container to ensure reproducibility and consistent software environments. The container used during this analysis was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
 
 The container was pulled from Docker Hub using:
 
+```bash
 singularity pull docker://trinityrnaseq/trinityrnaseq
 
 
 Scripts using Trinity are designed to run inside the container using:
 
+```bash
 singularity exec --bind $(pwd):$(pwd) trinityrnaseq_latest.sif <command>
 
 
