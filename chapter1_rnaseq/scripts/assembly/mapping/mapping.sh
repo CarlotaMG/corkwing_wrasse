@@ -3,9 +3,6 @@
 # Maps trimmed paired-end reads to the reference genome using STAR.
 # Produces sorted BAM files for each sample.
 
-# Load STAR
-module load STAR/2.7.10b-GCC-11.3.0
-
 # Check arguments
 if [ "$#" -ne 3 ]; then
     echo "Usage: $0 <index_dir> <trimmed_dir> <output_dir>"

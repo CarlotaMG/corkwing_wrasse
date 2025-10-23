@@ -11,9 +11,6 @@ LINEAGE="$2"
 OUTPUT_DIR="$3"
 THREADS="${4:-1}"  # Default to 1 thread if not provided
 
-# Load BUSCO module
-module load BUSCO/5.5.0-foss-2022b
-
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 

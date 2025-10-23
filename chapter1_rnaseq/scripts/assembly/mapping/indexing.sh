@@ -3,9 +3,6 @@
 # Builds a STAR genome index from the reference genome.
 # This index is required for mapping reads with STAR.
 
-# Load STAR
-module load STAR/2.7.10b-GCC-11.3.0
-
 # Check arguments
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <genome_fasta> <output_dir>"

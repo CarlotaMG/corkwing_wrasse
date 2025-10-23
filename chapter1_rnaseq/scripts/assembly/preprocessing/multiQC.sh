@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Load MultiQC
-module load MultiQC/1.22.3-foss-2023b
-
 # Check arguments
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <input_dir> <output_dir>"

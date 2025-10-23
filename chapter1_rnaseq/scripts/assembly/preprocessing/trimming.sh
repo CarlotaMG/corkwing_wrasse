@@ -10,9 +10,6 @@ INPUT_DIR="$1"
 OUTPUT_DIR="$2"
 ADAPTERS="$3"
 
-# Load Trimmomatic
-module load Trimmomatic/0.39-Java-11
-
 mkdir -p "$OUTPUT_DIR"
 
 FILES=($(ls "$INPUT_DIR"/*_R1.fastq.gz))
