@@ -34,7 +34,19 @@ This design reflects the actual workflow used during analysis and supports repro
 
 ⸺
 
-### Singularity Container for Trinity 
+### Working Environment
+This analysis was conducted in a mixed computational environment combining HPC modules, containerized tools, and R-based analyses.
+
+#### HPC Modules
+The following environment modules were loaded on the Saga cluster during analysis:
+- FastQC/0.12.1-Java-11
+- MultiQC/1.22.3-foss-2023b
+- Trimmomatic/0.39-Java-11
+- STAR/2.7.10b-GCC-11.3.0
+- SAMtools/1.16.1-GCC-11.3.0
+- BUSCO/5.5.0-foss-2022b
+
+#### Singularity Container for Trinity 
 Transcriptome assembly steps were performed within a Singularity container to ensure reproducibility and consistent software environments. The container used during this analysis was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
 
 The container was pulled from Docker Hub using:
