@@ -68,21 +68,25 @@ For more information, see [Trinity GitHub repository](https://github.com/trinity
 ### Transcriptome assembly
 #### Preprocessing and quality control:
 
-[fastQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastaQC.sh)
+[fastQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastQC.sh)
 
-Runs FastQC on FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories.
+Runs FastQC on FASTQ files to assess read quality. This script is parameterized to work with both raw and trimmed reads by specifying input and output directories. An optional third argument allows you to set the number of threads (default: 4).
 
 ##### Inputs
 - FASTQ files(*.fastq or *.fastq.gz) 
 ##### Outputs
 - FastQC reports (*.html, *.zip)
 ##### Usage
-bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir>
+```bash
+bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir> [threads]
+```
 ##### Examples
-bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/assembly/preprocessing/fastaQC/raw
-
-bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/assembly/preprocessing/fastaQC/trimmed
-
+```bash
+bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/assembly/preprocessing/fastaQC/raw 5
+```
+```bash
+bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/assembly/preprocessing/fastaQC/trimmed 5
+```
 ⸺
 
 [multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
@@ -94,12 +98,16 @@ Aggregates FastQC reports into a single summary using MultiQC. This script is de
 ##### Outputs
 - MultiQC summary report (multiqc_report.html) and associated files
 ##### Usage
+```bash
 bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
+```
 #### Examples
+```bash
 bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/raw results/assembly/preprocessing/multiQC/raw
-
+```
+```bash
 bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/trimmed results/assembly/preprocessing/multiQC/trimmed
-
+```
 ⸺
 
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
@@ -115,10 +123,14 @@ Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is design
 - *_R2_paired.fastq.gz
 - *_R2_unpaired.fastq.gz
 ##### Usage
+```bash
 sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
+```
 > Where `<N>` is the number of input FASTQ files minus one. For example, if you have 39 paired-end samples (78 FASTQ files total), use --array=0-77.
 ##### Example
+```bash
 sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
+```
 
 ⸺
 
@@ -134,10 +146,13 @@ Builds a STAR genome index from the reference genome. This index is required for
 ##### Outputs
 - STAR genome index files
 ##### Usage
+```bash
 bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
+```
 ##### Example
+```bash
 bash scripts/assembly/mapping/indexing.sh resources/ref_genome.fasta results/assembly/mapping/indexing
-
+```
 ⸺
 
 [mapping.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/mapping.sh)
@@ -150,10 +165,13 @@ Maps trimmed paired-end reads to the reference genome using STAR. This script lo
 ##### Outputs
 - Sorted BAM files for each sample
 ##### Usage
+```bash
 bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
+```
 ##### Example
+```bash
 bash scripts/assembly/mapping/mapping.sh  results/assembly/mapping/indexing data/trimmed_fastq results/assembly/mapping
-
+```
 ⸺
 
 [concatBAM.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/mapping/concatBAM.sh)
@@ -165,10 +183,13 @@ Merges all individual BAM files from the mapping step into a single file for use
 ##### Outputs
 - Merged BAM file (combined_for_assembly.bam)
 ##### Usage
+```bash
 bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
+```
 ##### Example
+```bash
 bash scripts/assembly/mapping/concatBAM.sh results/assembly/mapping results/assembly/mapping/combined_for_assembly.bam
-
+```
 ⸺
 
 #### Run Trinity Assembly:
@@ -183,10 +204,13 @@ Runs genome-guided de novo transcriptome assembly inside a Singularity container
 ##### Outputs
 - Assembled transcriptome (Trinity-GG.fasta) and associated files for quantification and annotation
 ##### Usage
+```bash
 bash scripts/assembly/trinity/trinity_run.sh <bam_file> <singularity_image> <output_dir>
+```
 ##### Example
+```bash
 bash scripts/assembly/trinity/trinity_run.sh results/mapping/combined_for_assembly.bam resources/trinityrnaseq_latest.sif results/assembly/trinity
-
+```
 > **Note:** Trinity was run in genome-guided mode with --genome_guided_max_intron 20000.
 The Butterfly stage (--bflyHeapSpaceMax 10G) uses 10 GB per thread, multiplied by 16 threads (--bflyCPU 16), totaling 160 GB — consistent with the overall memory setting (--max_memory 160G).
 To accommodate this, the script was executed via a SLURM job with --cpus-per-task=16 and a slightly higher memory allocation (--mem=170G) to ensure stability and account for container-related overhead.
@@ -205,10 +229,13 @@ Generates basic statistics for the Trinity-assembled transcriptome using `Trinit
 ##### Outputs
 - Trinity assembly statistics (`trinity_stats.txt`)
 ##### Usage
+```bash
 bash scripts/assembly/post_assembly/stats/trinity_stats.sh <trinity_fasta> <singularity_image> <output_file>
+```
 ##### Example
+```bash
 bash scripts/assembly/post_assembly/stats/trinity_stats.sh results/assembly/trinity/Trinity-GG.fasta resources/trinityrnaseq_latest.sif results/assembly/post_assembly/stats/trinity_stats.txt
-
+```
 ⸺
 
 [busco_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/busco_stats.sh)
@@ -222,10 +249,13 @@ Assesses the completeness of the Trinity-assembled transcriptome using BUSCO v5.
 ##### Outputs
 - Completeness metrics based on conserved orthologs, along with associated logs and intermediate files
 ##### Usage
+```bash
 bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir>
+```
 ##### Example
+```bash 
 bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco
-
+```
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 ⸺
 
