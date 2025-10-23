@@ -1,26 +1,34 @@
 #!/bin/bash
 
-# Check arguments
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <input_dir> <output_dir> <adapter_file>"
+# Trimming paired-end reads with Trimmomatic
+
+# Check input arguments
+if [ "$#" -ne 5 ]; then
+    echo "Usage: $0 <file_R1> <file_R2> <output_dir> <adapter_file> <threads>"
     exit 1
 fi
 
-INPUT_DIR="$1"
-OUTPUT_DIR="$2"
-ADAPTERS="$3"
+# Assign input variables
+FILE_R1="$1"
+FILE_R2="$2"
+OUTPUT_DIR="$3"
+ADAPTERS="$4"
+THREADS="$5"
 
-mkdir -p "$OUTPUT_DIR"
-
-FILES=($(ls "$INPUT_DIR"/*_R1.fastq.gz))
-FILE_R1=${FILES[$SLURM_ARRAY_TASK_ID]}
-FILE_R2=${FILE_R1/_R1.fastq.gz/_R2.fastq.gz}
+# Extract sample name
 BASENAME=$(basename "$FILE_R1" _R1.fastq.gz)
 
-java -jar "$EBROOTTRIMMOMATIC/trimmomatic-0.39.jar" PE -threads 8 \
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+# Run Trimmomatic with quality and adapter trimming
+java -jar "$EBROOTTRIMMOMATIC/trimmomatic-0.39.jar" PE -threads "$THREADS" \
     "$FILE_R1" "$FILE_R2" \
     "$OUTPUT_DIR/${BASENAME}_R1_paired.fastq.gz" "$OUTPUT_DIR/${BASENAME}_R1_unpaired.fastq.gz" \
     "$OUTPUT_DIR/${BASENAME}_R2_paired.fastq.gz" "$OUTPUT_DIR/${BASENAME}_R2_unpaired.fastq.gz" \
-    ILLUMINACLIP:"$ADAPTERS":2:30:10 \
-    SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:30 MAXINFO:30:0.4 \
-    HEADCROP:10 CROP:100
+    ILLUMINACLIP:"$ADAPTERS":2:30:10 \  # Adapter trimming
+    SLIDINGWINDOW:4:5 \                 # Quality trimming in sliding window
+    LEADING:5 TRAILING:5 \              # Trim low-quality bases from ends
+    MINLEN:30 \                         # Drop short reads
+    MAXINFO:30:0.4 \                    # Adaptive trimming
+    HEADCROP:10 CROP:100                # Crop reads to uniform length
