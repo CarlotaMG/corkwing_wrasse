@@ -129,12 +129,12 @@ bash scripts/assembly/preprocessing/trimming.sh <file_R1> <file_R2> <output_dir>
 ```
 ##### Slurm array job example
 ```bash
-# Inside a SLURM array job (e.g., --array=0-77 --cpu-per-task=16)
-R1_FILES=($(ls /cluster/work/users/carlota/concatenated_raw/*_R1.fastq.gz))
+R1_FILES=(data/raw_fastq/*_R1.fastq.gz)
 FILE_R1=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
 FILE_R2=${FILE_R1/_R1.fastq.gz/_R2.fastq.gz}
 
-bash scripts/assembly/preprocessing/trimming.sh "$FILE_R1" "$FILE_R2" /cluster/work/users/carlota/trimmed /cluster/work/users/carlota/TruSeq3-PE.fa $SLURM_CPUS_PER_TASK
+bash scripts/assembly/preprocessing/trimming.sh "$FILE_R1" "$FILE_R2" \
+  data/trimmed_fastq resources/adapters/TruSeq3-PE.fa $SLURM_CPUS_PER_TASK
 ```
 
 ⸺
