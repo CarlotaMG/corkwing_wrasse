@@ -222,7 +222,7 @@ To accommodate this, the script was executed via a SLURM job with --cpus-per-tas
 
 ⸺
 
-#### Post-assembly evaluation:
+#### Post-assembly Evaluation:
 
 [trinity_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/trinity_stats.sh)
 
@@ -262,7 +262,88 @@ bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_
 bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco
 ```
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
+
 ⸺
+
+#### Post-assembly Quantification:
+
+[estimate_abundance.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/estimate_abundance.sh)
+
+Estimates transcript abundance for a single sample using RSEM via Trinity utilities inside a Singularity container.
+The script takes six arguments: a left reads FASTQ file, a right reads FASTQ file, a Trinity-assembled transcriptome FASTA file, a Singularity image, an output directory, and a thread count. It is designed to be modular and is typically called within a SLURM array job to process multiple samples in parallel.
+
+##### Inputs
+- Left FASTQ file (`*_R1_paired.fastq.gz`)
+- Right FASTQ file (`*_R2_paired.fastq.gz`)
+- Trinity-assembled transcriptome FASTA file
+##### Outputs
+- RSEM output files in a sample-specific subdirectory
+- Log files (`.out`, `.err`)
+##### Usage
+```bash
+bash scripts/quantification/estimate_abundance.sh <left_reads> <right_reads> <transcriptome_fasta> <singularity_image> <output_dir> <thread_count>
+```
+##### SLURM array job example
+```bash
+R1_FILES=(data/trimmed_fastq/*_R1_paired.fastq.gz)
+R1_FILE=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
+R2_FILE=${R1_FILE/_R1_paired.fastq.gz/_R2_paired.fastq.gz}
+
+bash scripts/quantification/estimate_abundance.sh "$R1_FILE" "$R2_FILE" \
+  results/assembly/trinity/Trinity-GG.fasta resources/containers/trinityrnaseq_latest.sif \
+  results/quantification/rsem $SLURM_CPUS_PER_TASK
+```
+
+⸺
+
+[compile_abundance.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/compile_abundance.sh)
+
+Compiles gene- and isoform-level abundance matrices from RSEM output files.
+The script takes four arguments: a directory containing RSEM output files, a gene-to-transcript mapping file, a Singularity image, and an output directory.
+##### Inputs
+- RSEM directories (e.g., results/quantification/rsem/rsem_*)
+- Gene-to-transcript mapping file (e.g., results/assembly/trinity/Trinity-GG.fasta.gene_trans_map)
+##### Ouputs
+- Gene- and isoform-level abundance matrices
+##### Usage
+```bash
+bash scripts/quantification/compile_abundance.sh <rsem_dir> <gene_trans_map> <singularity_image> <output_dir>
+```
+##### Example
+```bash
+bash scripts/quantification/compile_abundance.sh results/quantification/rsem \
+  results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
+  resources/containers/trinityrnaseq_latest.sif \
+  results/quantification/compiled
+```
+⸺
+
+[cumulative_counts.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/cumulative_counts.sh)
+
+Computes cumulative feature counts across samples.
+The script takes three arguments: a directory containing RSEM output files, a Singularity image, and an output directory.
+##### Inputs
+- RSEM directories (e.g., results/quantification/rsem/rsem_*)
+##### Ouputs
+- Per-sample cumulative count files, and combined summary file (`cumul_counts_combined.txt`)
+##### Usage
+```bash
+bash scripts/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> <output_dir>
+```
+##### Example
+```bash
+bash scripts/quantification/cumulative_counts.sh results/quantification trinityrnaseq_latest.sif results/quantification/cumulative_counts
+```
+
+⸺
+
+
+
+
+
+
+
+
 
 #### trinities_filter_by_gene_cov.sh
 
