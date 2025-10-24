@@ -112,11 +112,12 @@ bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fa
 
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
 
-Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is designed to be executed as part of a SLURM array job and accepts three arguments: input directory, output directory, and adapter file.
+Trims paired-end RNA-seq reads using Trimmomatic.
+This script takes five arguments: a forward reads FASTQ file, a reverse reads FASTQ file, an adapter file, an output directory, and a thread count. It is designed to be modular and is typically called within a SLURM array job to process multiple samples in parallel.
 
 ##### Inputs
 - Paired-end FASTQ files (*_R1.fastq.gz, *_R2.fastq.gz)
-- Adapter file (TruSeq3-PE.fa)
+- Adapter file (e.g., TruSeq3-PE.fa)
 ##### Outputs
 - *_R1_paired.fastq.gz
 - *_R1_unpaired.fastq.gz
@@ -124,12 +125,16 @@ Runs Trimmomatic in paired-end mode to trim RNA-seq reads. This script is design
 - *_R2_unpaired.fastq.gz
 ##### Usage
 ```bash
-sbatch --array=0-`<N>` scripts/assembly/preprocessing/trimming.sh <input_dir> <output_dir> <adapter_file>
+bash scripts/assembly/preprocessing/trimming.sh <file_R1> <file_R2> <output_dir> <adapter_file> <threads>
 ```
-> Where `<N>` is the number of input FASTQ files minus one. For example, if you have 39 paired-end samples (78 FASTQ files total), use --array=0-77.
-##### Example
+##### Slurm array job example
 ```bash
-sbatch --array=0-77 scripts/assembly/preprocessing/trimming.sh data/raw_fastq data/trimmed_fastq resources/TruSeq3-PE.fa
+# Inside a SLURM array job (e.g., --array=0-77 --cpu-per-task=16)
+R1_FILES=($(ls /cluster/work/users/carlota/concatenated_raw/*_R1.fastq.gz))
+FILE_R1=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
+FILE_R2=${FILE_R1/_R1.fastq.gz/_R2.fastq.gz}
+
+bash scripts/assembly/preprocessing/trimming.sh "$FILE_R1" "$FILE_R2" /cluster/work/users/carlota/trimmed /cluster/work/users/carlota/TruSeq3-PE.fa $SLURM_CPUS_PER_TASK
 ```
 
 ⸺
