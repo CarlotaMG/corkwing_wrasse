@@ -260,7 +260,6 @@ bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_
 ```bash
 bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco 5
 ```
->>>>>>> Stashed changes
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 
 ⸺
