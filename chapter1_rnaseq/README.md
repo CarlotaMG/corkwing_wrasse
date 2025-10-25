@@ -245,22 +245,22 @@ bash scripts/assembly/post_assembly/stats/trinity_stats.sh results/assembly/trin
 
 [busco_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/busco_stats.sh)
 
-Assesses the completeness of the Trinity-assembled transcriptome using BUSCO v5.5.0. The script accepts three arguments: the input FASTA file, the name of a BUSCO lineage dataset, and the output directory.
+Assesses the completeness of the Trinity-assembled transcriptome using BUSCO. The script accepts three arguments: the input FASTA file, the name of a BUSCO lineage dataset, the output directory, and optionally the number of threads.
 
 ##### Inputs
 - Trinity-assembled transcriptome (Trinity-GG.fasta)
 - BUSCO lineage dataset (e.g., actinopterygii_odb10)
-- Output directory (e.g., results/assembly/post_assembly/stats/busco/)
 ##### Outputs
 - Completeness metrics based on conserved orthologs, along with associated logs and intermediate files
 ##### Usage
 ```bash
-bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir>
+bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir> [num_threads]
 ```
 ##### Example
-```bash 
-bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco
+```bash
+bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco 5
 ```
+>>>>>>> Stashed changes
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 
 ⸺
