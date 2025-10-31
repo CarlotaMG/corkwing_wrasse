@@ -57,7 +57,7 @@ singularity pull --dir resources/ docker://trinityrnaseq/trinityrnaseq
 
 Scripts using Trinity are designed to run inside the container using:
 ```bash
-singularity exec --bind $(pwd):$(pwd) trinityrnaseq_latest.sif <command>
+singularity exec --bind $(pwd):$(pwd) resources/trinityrnaseq_latest.sif <command>
 ```
 
 For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
@@ -72,7 +72,7 @@ wget -P resources/ https://github.com/Trinotate/Trinotate/releases/download/v4.0
 
 Scripts using Trinotate are designed to run inside the container using:
 ```bash
-singularity exec --bind $(pwd):$(pwd) trinotate.v4.0.2.simg <command>
+singularity exec --bind $(pwd):$(pwd) resources/trinotate.v4.0.2.simg <command>
 ```
 
 ---
