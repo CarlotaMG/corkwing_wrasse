@@ -126,10 +126,14 @@ bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
 ```
 #### Examples
 ```bash
-bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/raw results/assembly/preprocessing/multiQC/raw
+bash scripts/assembly/preprocessing/multiQC.sh \
+results/assembly/preprocessing/fastaQC/raw \
+results/assembly/preprocessing/multiQC/raw
 ```
 ```bash
-bash scripts/assembly/preprocessing/multiQC.sh results/assembly/preprocessing/fastaQC/trimmed results/assembly/preprocessing/multiQC/trimmed
+bash scripts/assembly/preprocessing/multiQC.sh \
+results/assembly/preprocessing/fastaQC/trimmed \
+results/assembly/preprocessing/multiQC/trimmed
 ```
 ⸺
 
@@ -156,8 +160,12 @@ R1_FILES=(data/raw_fastq/*_R1.fastq.gz)
 FILE_R1=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
 FILE_R2=${FILE_R1/_R1.fastq.gz/_R2.fastq.gz}
 
-bash scripts/assembly/preprocessing/trimming.sh "$FILE_R1" "$FILE_R2" \
-  data/trimmed_fastq resources/adapters/TruSeq3-PE.fa $SLURM_CPUS_PER_TASK
+bash scripts/assembly/preprocessing/trimming.sh \
+"$FILE_R1" \
+"$FILE_R2" \
+data/trimmed_fastq \
+resources/adapters/TruSeq3-PE.fa \
+$SLURM_CPUS_PER_TASK
 ```
 
 ⸺
@@ -198,7 +206,9 @@ bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 ```
 ##### Example
 ```bash
-bash scripts/assembly/mapping/mapping.sh  results/assembly/mapping/indexing data/trimmed_fastq results/assembly/mapping
+bash scripts/assembly/mapping/mapping.sh \
+results/assembly/mapping/indexing data/trimmed_fastq \
+results/assembly/mapping
 ```
 ⸺
 
@@ -216,7 +226,9 @@ bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
 ```
 ##### Example
 ```bash
-bash scripts/assembly/mapping/concatBAM.sh results/assembly/mapping results/assembly/mapping/combined_for_assembly.bam
+bash scripts/assembly/mapping/concatBAM.sh \
+results/assembly/mapping \
+results/assembly/mapping/combined_for_assembly.bam
 ```
 ⸺
 
@@ -237,7 +249,9 @@ bash scripts/assembly/trinity/trinity_run.sh <bam_file> <singularity_image> <out
 ```
 ##### Example
 ```bash
-bash scripts/assembly/trinity/trinity_run.sh results/mapping/combined_for_assembly.bam resources/trinityrnaseq_latest.sif results/assembly/trinity
+bash scripts/assembly/trinity/trinity_run.sh \
+results/mapping/combined_for_assembly.bam \
+resources/trinityrnaseq_latest.sif results/assembly/trinity
 ```
 > **Note:** Trinity was run in genome-guided mode with --genome_guided_max_intron 20000.
 The Butterfly stage (--bflyHeapSpaceMax 10G) uses 10 GB per thread, multiplied by 16 threads (--bflyCPU 16), totaling 160 GB — consistent with the overall memory setting (--max_memory 160G).
@@ -262,7 +276,10 @@ bash scripts/assembly/post_assembly/stats/trinity_stats.sh <trinity_fasta> <sing
 ```
 ##### Example
 ```bash
-bash scripts/assembly/post_assembly/stats/trinity_stats.sh results/assembly/trinity/Trinity-GG.fasta resources/trinityrnaseq_latest.sif results/assembly/post_assembly/stats/trinity_stats.txt
+bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
+results/assembly/trinity/Trinity-GG.fasta \
+resources/trinityrnaseq_latest.sif \
+results/assembly/post_assembly/stats/trinity_stats.txt
 ```
 ⸺
 
@@ -277,11 +294,19 @@ Assesses the completeness of the Trinity-assembled transcriptome using BUSCO. Th
 - Completeness metrics based on conserved orthologs, along with associated logs and intermediate files
 ##### Usage
 ```bash
-bash scripts/assembly/post_assembly/stats/busco_stats.sh <input_fasta> <lineage_dataset> <output_dir> [num_threads]
+bash scripts/assembly/post_assembly/stats/busco_stats.sh \
+<input_fasta> \
+<lineage_dataset> \
+<output_dir> \
+[num_threads]
 ```
 ##### Example
 ```bash
-bash scripts/assembly/post_assembly/stats/busco_stats.sh results/assembly/trinity/Trinity-GG.fasta actinopterygii_odb10 results/assembly/post_assembly/stats/busco 5
+bash scripts/assembly/post_assembly/stats/busco_stats.sh \
+results/assembly/trinity/Trinity-GG.fasta \
+actinopterygii_odb10 \
+results/assembly/post_assembly/stats/busco \
+5
 ```
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 
@@ -303,7 +328,13 @@ The script takes six arguments: a left reads FASTQ file, a right reads FASTQ fil
 - Log files (`.out`, `.err`)
 ##### Usage
 ```bash
-bash scripts/quantification/estimate_abundance.sh <left_reads> <right_reads> <transcriptome_fasta> <singularity_image> <output_dir> <thread_count>
+bash scripts/quantification/estimate_abundance.sh \
+<left_reads> \
+<right_reads> \
+<transcriptome_fasta> \
+<singularity_image> \
+<output_dir> \
+<thread_count>
 ```
 ##### SLURM array job example
 ```bash
@@ -311,9 +342,13 @@ R1_FILES=(data/trimmed_fastq/*_R1_paired.fastq.gz)
 R1_FILE=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
 R2_FILE=${R1_FILE/_R1_paired.fastq.gz/_R2_paired.fastq.gz}
 
-bash scripts/quantification/estimate_abundance.sh "$R1_FILE" "$R2_FILE" \
-  results/assembly/trinity/Trinity-GG.fasta resources/containers/trinityrnaseq_latest.sif \
-  results/quantification/rsem $SLURM_CPUS_PER_TASK
+bash scripts/quantification/estimate_abundance.sh \
+"$R1_FILE" \
+"$R2_FILE" \
+results/assembly/trinity/Trinity-GG.fasta \
+resources/containers/trinityrnaseq_latest.sif \
+results/quantification/rsem \
+$SLURM_CPUS_PER_TASK
 ```
 
 ⸺
@@ -329,7 +364,11 @@ The script takes four arguments: a directory containing RSEM output files, a gen
 - Gene- and isoform-level abundance matrices
 ##### Usage
 ```bash
-bash scripts/quantification/compile_abundance.sh <rsem_dir> <gene_trans_map> <singularity_image> <output_dir>
+bash scripts/quantification/compile_abundance.sh \
+<rsem_dir> \
+<gene_trans_map> \
+<singularity_image> \
+<output_dir>
 ```
 ##### Example
 ```bash
@@ -354,7 +393,10 @@ bash scripts/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> 
 ```
 ##### Example
 ```bash
-bash scripts/quantification/cumulative_counts.sh results/quantification trinityrnaseq_latest.sif results/quantification/cumulative_counts
+bash scripts/quantification/cumulative_counts.sh \
+results/quantification \
+trinityrnaseq_latest.sif \
+results/quantification/cumulative_counts
 ```
 
 ⸺
