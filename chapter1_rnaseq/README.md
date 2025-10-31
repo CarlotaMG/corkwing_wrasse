@@ -152,7 +152,12 @@ This script takes five arguments: a forward reads FASTQ file, a reverse reads FA
 - *_R2_unpaired.fastq.gz
 ##### Usage
 ```bash
-bash scripts/assembly/preprocessing/trimming.sh <file_R1> <file_R2> <output_dir> <adapter_file> <threads>
+bash scripts/assembly/preprocessing/trimming.sh \
+<file_R1> \
+<file_R2> \
+<output_dir> \
+<adapter_file> \
+<threads>
 ```
 ##### Slurm array job example
 ```bash
@@ -272,7 +277,10 @@ Generates basic statistics for the Trinity-assembled transcriptome using `Trinit
 - Trinity assembly statistics (`trinity_stats.txt`)
 ##### Usage
 ```bash
-bash scripts/assembly/post_assembly/stats/trinity_stats.sh <trinity_fasta> <singularity_image> <output_file>
+bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
+<trinity_fasta> \
+<singularity_image> \
+<output_file>
 ```
 ##### Example
 ```bash
@@ -373,9 +381,9 @@ bash scripts/quantification/compile_abundance.sh \
 ##### Example
 ```bash
 bash scripts/quantification/compile_abundance.sh results/quantification/rsem \
-  results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
-  resources/containers/trinityrnaseq_latest.sif \
-  results/quantification/compiled
+results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
+resources/containers/trinityrnaseq_latest.sif \
+results/quantification/compiled
 ```
 ⸺
 
