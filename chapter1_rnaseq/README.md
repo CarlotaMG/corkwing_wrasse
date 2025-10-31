@@ -409,12 +409,94 @@ results/quantification/cumulative_counts
 
 ⸺
 
+### Transcriptome Annotation
 
+> **Note:** SignalP and TMHMM are not included in the Singularity image due to licensing restrictions. These tools were run using cluster modules and their outputs were integrated into the Trinotate pipeline during the evidence loading step.
 
+[transdecoder_longorfs.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_longorfs.sh)
 
+Identifies long open reading frames (ORFs) in Trinity-assembled transcripts and links them to gene IDs. The script accepts four arguments: the transcriptome FASTA file, the gene-transcript mapping file, the Singularity image, and the output directory.
+##### Inputs
+- Trinity transcriptome FASTA file (Trinity-GG.fasta)
+- Gene-to-transcript mapping file (Trinity-GG.fasta.gene_trans_map)
+##### Outputs
+- Predicted peptide sequences (longest_orfs.pep)
+- ORF coordinates (longest_orfs.gff3)
+##### Usage
+```bash
+bash scripts/annotation/trinotate/transdecoder_longorfs.sh \
+<transcriptome_fasta> \
+<gene_trans_map> \
+<singularity_image> \
+<output_dir>
+```
+##### Example
+```bash
+bash scripts/annotation/trinotate/transdecoder_longorfs.sh \
+results/assembly/trinity/Trinity-GG.fasta \
+results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
+resources/trinotate.v4.0.2.simg \
+results/annotation/trinotate/transdecoder_longorfs
+```
 
+⸺
 
+[blastp.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/blastp.sh)
 
+Runs blastp on predicted peptide sequences against the UniProtKB/Swiss-Prot protein database using a Singularity container. The script takes a peptide FASTA file, a Singularity image, a desired filename for the Swiss-Prot FASTA file, and an output directory. If the UniProtKB/Swiss-Prot FASTA file is missing, the script downloads and decompresses it, then uses it to build a BLAST database with makeblastdb. It subsequently runs blastp to align the peptide sequences against this database.
+##### Inputs
+- Predicted peptide sequences (e.g., longest_orfs.pep)
+##### Outputs
+- Top 5 hits per query in tabular BLAST format (blastp.outfmt6)
+- Swiss-Prot protein database FASTA file (e.g., uniprot_sprot_2025_10.fasta)
+- BLAST database index files (.pin, .phr, .psq)
+##### Usage
+```bash
+bash scripts/annotation/trinotate/blastp.sh \
+<pep_file> \
+<singularity_image> \
+<fasta_file> \
+<output_dir>
+```
+##### Example
+```bash
+bash scripts/annotation/trinotate/blastp.sh \
+/cluster/work/users/carlota/results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+resources/trinotate.v4.0.2.simg \
+resources/uniprot_sprot/uniprot_sprot_2025_10.fasta \
+results/annotation/trinotate/blastp
+```
+⸺
+
+[pfam.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam.sh)
+
+Runs hmmscan on predicted peptide sequences to identify conserved protein domains using the Pfam-A HMM database within a Singularity container. The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
+##### Inputs
+- Predicted peptide sequences (e.g., longest_orfs.pep)
+##### Outputs
+- Domain table output (pfam.domtblout)
+- Pfam-A HMM file (e.g., Pfam-A_2025_10.hmm)
+- Pfam HMM index files (.h3f, .h3i, .h3m, .h3p)
+##### Usage
+```bash
+bash scripts/annotation/trinotate/pfam.sh \
+<pep_file> \
+<singularity_image> \
+<pfam_hmm> \
+<output_dir> \
+<threads>
+```
+##### Example
+```bash
+bash scripts/annotation/trinotate/pfam.sh \
+/cluster/work/users/carlota/results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+resources/trinotate.v4.0.2.simg \
+resources/pfam/Pfam-A_2025_10.hmm \
+results/annotation/trinotate/pfam \
+16
+```
+
+⸺
 
 
 #### trinities_filter_by_gene_cov.sh
