@@ -36,6 +36,7 @@ This design reflects the actual workflow used during analysis and supports repro
 
 ### Working Environment
 This analysis was conducted in a mixed computational environment combining HPC modules, containerized tools, and R-based analyses.
+Transcriptome assembly and annotation steps were performed each within their own Singularity container to ensure reproducibility and consistent software environments.
 
 #### HPC Modules
 The following environment modules were loaded on the Saga cluster during analysis:
@@ -47,11 +48,11 @@ The following environment modules were loaded on the Saga cluster during analysi
 - BUSCO/5.5.0-foss-2022b
 
 #### Singularity Container for Trinity 
-Transcriptome assembly steps were performed within a Singularity container to ensure reproducibility and consistent software environments. The container used during this analysis was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
+The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
 
 The container was pulled from Docker Hub using:
 ```bash
-singularity pull docker://trinityrnaseq/trinityrnaseq
+singularity pull --dir resources/ docker://trinityrnaseq/trinityrnaseq
 ```
 
 Scripts using Trinity are designed to run inside the container using:
@@ -60,6 +61,19 @@ singularity exec --bind $(pwd):$(pwd) trinityrnaseq_latest.sif <command>
 ```
 
 For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
+
+#### Singularity Container for Trinotate
+The container used during transcript annotation was downloaded from the Trinotate GitHub release page on October 25, 2025. It included Trinotate v4.0.2, along with supporting tools for transcript annotation and database integration.
+
+The container was downloaded from GitHub using:
+```bash
+wget -P resources/ https://github.com/Trinotate/Trinotate/releases/download/v4.0.2/trinotate.v4.0.2.simg
+```
+
+Scripts using Trinotate are designed to run inside the container using:
+```bash
+singularity exec --bind $(pwd):$(pwd) trinotate.v4.0.2.simg <command>
+```
 
 ---
 
