@@ -65,15 +65,17 @@ For more information, see [Trinity GitHub repository](https://github.com/trinity
 #### Singularity Container for Trinotate
 The container used during transcript annotation was downloaded from the Trinotate GitHub release page on October 25, 2025. It included Trinotate v4.0.2, along with supporting tools for transcript annotation and database integration.
 
-The container was downloaded from GitHub using:
+The container was downloaded from the Broad Institute's Trinity resource server using:
 ```bash
-wget -P resources/ https://github.com/Trinotate/Trinotate/releases/download/v4.0.2/trinotate.v4.0.2.simg
+singularity pull --dir resources/ https://data.broadinstitute.org/Trinity/TRINOTATE_SINGULARITY/trinotate.v4.0.2.simg
 ```
 
 Scripts using Trinotate are designed to run inside the container using:
 ```bash
 singularity exec --bind $(pwd):$(pwd) resources/trinotate.v4.0.2.simg <command>
 ```
+
+For more information, see [Trinotate GitHub repository](https://github.com/Trinotate/Trinotate).
 
 ---
 
