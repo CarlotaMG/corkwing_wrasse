@@ -63,7 +63,7 @@ singularity exec --bind $(pwd):$(pwd) resources/trinityrnaseq_latest.sif <comman
 For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
 
 #### Singularity Container for Trinotate
-The container used during transcript annotation was downloaded from the Trinotate GitHub release page on October 25, 2025. It included Trinotate v4.0.2, along with supporting tools for transcript annotation and database integration.
+The container used for transcript annotation was downloaded on October 25, 2025 from the Broad Institute's Trinity resource server. It included Trinotate v4.0.2, along with supporting tools for transcript annotation and database integration.
 
 The container was downloaded from the Broad Institute's Trinity resource server using:
 ```bash
