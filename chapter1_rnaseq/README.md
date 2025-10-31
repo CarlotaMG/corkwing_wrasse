@@ -67,7 +67,8 @@ The container used during transcript annotation was downloaded from the Trinotat
 
 The container was downloaded from the Broad Institute's Trinity resource server using:
 ```bash
-singularity pull --dir resources/ https://data.broadinstitute.org/Trinity/TRINOTATE_SINGULARITY/trinotate.v4.0.2.simg
+singularity pull --dir resources/ \
+https://data.broadinstitute.org/Trinity/TRINOTATE_SINGULARITY/trinotate.v4.0.2.simg
 ```
 
 Scripts using Trinotate are designed to run inside the container using:
@@ -98,10 +99,16 @@ bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir> [threads
 ```
 ##### Examples
 ```bash
-bash scripts/assembly/preprocessing/fastaQC.sh data/raw_fastq results/assembly/preprocessing/fastaQC/raw 5
+bash scripts/assembly/preprocessing/fastaQC.sh \
+data/raw_fastq \
+results/assembly/preprocessing/fastaQC/raw \
+5
 ```
 ```bash
-bash scripts/assembly/preprocessing/fastaQC.sh data/trimmed_fastq results/assembly/preprocessing/fastaQC/trimmed 5
+bash scripts/assembly/preprocessing/fastaQC.sh \
+data/trimmed_fastq \
+results/assembly/preprocessing/fastaQC/trimmed \
+5
 ```
 ⸺
 
