@@ -67,8 +67,8 @@ The container used for transcript annotation was downloaded on October 25, 2025 
 
 The container was downloaded from the Broad Institute's Trinity resource server using:
 ```bash
-singularity pull --dir resources/ \
-https://data.broadinstitute.org/Trinity/TRINOTATE_SINGULARITY/trinotate.v4.0.2.simg
+wget https://data.broadinstitute.org/Trinity/TRINOTATE_SINGULARITY/trinotate.v4.0.2.simg \
+-O resources/trinotate.v4.0.2.simg
 ```
 
 Scripts using Trinotate are designed to run inside the container using:
