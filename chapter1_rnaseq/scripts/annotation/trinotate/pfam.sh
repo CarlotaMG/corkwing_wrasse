@@ -1,24 +1,25 @@
 #!/bin/bash
 
 # Check for correct number of arguments
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 <pep_file> <singularity_image> <pfam_hmm> <output_dir> <threads>"
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <pep_file> <singularity_image> <pfam_hmm> <output_dir>"
     exit 1
 fi
 
 
-# Define input arguments
+# Assign input arguments to variables
 PEP_FILE="$1"
 SINGULARITY_IMAGE="$2"
 PFAM_HMM="$3"
 OUTPUT_DIR="$4"
-THREADS="$5"
 
-# Extract directory and base name of Pfam HMM file
+
+# Extract directory and base name of the Pfam HMM file
 PFAM_DIR=$(dirname "$PFAM_HMM")
 PFAM_PREFIX=$(basename "$PFAM_HMM" .hmm)
 
-# Create output directory if it doesn't exist
+
+# Ensure the output directory exists
 mkdir -p "$OUTPUT_DIR"
 
 # Download Pfam-A.hmm if missing
@@ -38,13 +39,17 @@ if [ ! -f "${PFAM_HMM}.h3f" ]; then
       hmmpress "$PFAM_HMM"
 fi
 
-# Run hmmscan with domain E-value threshold
-echo "Running hmmscan..."
+# Extract base name of input file for output naming
+CHUNK_NAME=$(basename "$PEP_FILE" .pep)
+
+# Run hmmscan
+echo "Running hmmscan on $CHUNK_NAME..."
 singularity exec \
   --bind /cluster/projects/nn12014k:/cluster/projects/nn12014k \
   --bind /cluster/work/users/carlota:/cluster/work/users/carlota \
   "$SINGULARITY_IMAGE" \
-  hmmscan --cpu "$THREADS" \
-          --domtblout "$OUTPUT_DIR/pfam.domtblout" \
-          --domE 1e-5 \
-          "$PFAM_HMM" "$PEP_FILE"
+  hmmscan \
+    --domtblout "$OUTPUT_DIR/${CHUNK_NAME}.domtblout" \
+    --domE 1e-5 \
+    "$PFAM_HMM" "$PEP_FILE"
+
