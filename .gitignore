@@ -6,6 +6,13 @@ chapter2_wgs/data/
 chapter2_wgs/results/
 chapter2_wgs/jobs/
 
+# Ignore everything in resources/
+chapter1_rnaseq/resources/*
+
+# But keep this small config file
+!chapter1_rnaseq/resources/TruSeq3-PE.fa
+
+
 # History files
 .Rhistory
 .Rapp.history

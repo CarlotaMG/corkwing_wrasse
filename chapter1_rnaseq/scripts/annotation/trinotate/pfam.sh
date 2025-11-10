@@ -30,7 +30,7 @@ if [ ! -f "$PFAM_HMM" ]; then
 fi
 
 # Index Pfam-A.hmm if needed
-if [ ! -f "${PFAM_HMM}.h3f" ]; then
+if [ ! -f "${PFAM_HMM}.h3f" ] || [ ! -f "${PFAM_HMM}.h3i" ] || [ ! -f "${PFAM_HMM}.h3m" ] || [ ! -f "${PFAM_HMM}.h3p" ]; then
     echo "Indexing Pfam-A.hmm with hmmpress..."
     singularity exec \
       --bind /cluster/projects/nn12014k:/cluster/projects/nn12014k \
@@ -38,6 +38,13 @@ if [ ! -f "${PFAM_HMM}.h3f" ]; then
       "$SINGULARITY_IMAGE" \
       hmmpress "$PFAM_HMM"
 fi
+
+
+# Wait until all files are present
+while [ ! -f "${PFAM_HMM}.h3f" ] || [ ! -f "${PFAM_HMM}.h3i" ] || [ ! -f "${PFAM_HMM}.h3m" ] || [ ! -f "${PFAM_HMM}.h3p" ]; do
+    echo "Waiting for hmmpress to finish..."
+    sleep 5
+done
 
 # Extract base name of input file for output naming
 CHUNK_NAME=$(basename "$PEP_FILE" .pep)
