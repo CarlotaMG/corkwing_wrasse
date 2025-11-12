@@ -18,18 +18,18 @@ echo "Pfam DB: $PFAM_HMM"
 echo "Output: $OUT_FILE"
 echo "Threads: $THREADS"
 
-# If TMPDIR exists (HPC local scratch), copy Pfam DB there for faster access
-if [ -n "$TMPDIR" ]; then
-    echo "[$(date)] TMPDIR detected: $TMPDIR"
-    echo "Copying Pfam DB to TMPDIR..."
-    rsync -ah "${PFAM_HMM}"* "$TMPDIR/"
+# If LOCALSCRATCH exists (HPC local scratch), copy Pfam DB there for faster access
+if [ -n "$LOCALSCRATCH" ]; then
+    echo "[$(date)] LOCALSCRATCH detected: $LOCALSCRATCH"
+    echo "Copying Pfam DB to LOCALSCRATCH..."
+    rsync -ah "${PFAM_HMM}"* "$LOCALSCRATCH/"
     if [ $? -ne 0 ]; then
-        echo "[$(date)] ERROR: Failed to copy Pfam DB to TMPDIR." >&2
+        echo "[$(date)] ERROR: Failed to copy Pfam DB to LOCALSCRATCH." >&2
         exit 1
     fi
-    PFAM_HMM="$TMPDIR/$(basename "$PFAM_HMM")"
+    PFAM_HMM="$LOCALSCRATCH/$(basename "$PFAM_HMM")"
 else
-    echo "[$(date)] TMPDIR not set, using original Pfam DB path."
+    echo "[$(date)] LOCALSCRATCH not available, using original Pfam DB path."
 fi
 
 echo "[$(date)] Running hmmscan on peptide chunk..."
