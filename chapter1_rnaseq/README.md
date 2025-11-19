@@ -461,7 +461,7 @@ bash scripts/annotation/trinotate/blastp.sh \
 ##### Example
 ```bash
 bash scripts/annotation/trinotate/blastp.sh \
-/cluster/work/users/carlota/results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
 resources/trinotate.v4.0.2.simg \
 resources/uniprot_sprot/uniprot_sprot_2025_10.fasta \
 results/annotation/trinotate/blastp
@@ -470,7 +470,7 @@ results/annotation/trinotate/blastp
 
 [pfam.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam.sh)
 
-Runs hmmscan on predicted peptide sequences to identify conserved protein domains using the Pfam-A HMM database within a Singularity container. The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
+Runs hmmscan on predicted peptide sequences to identify conserved protein domains, The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
 ##### Inputs
 - Predicted peptide sequences (e.g., longest_orfs.pep)
 ##### Outputs
@@ -489,13 +489,17 @@ bash scripts/annotation/trinotate/pfam.sh \
 ##### Example
 ```bash
 bash scripts/annotation/trinotate/pfam.sh \
-/cluster/work/users/carlota/results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
 resources/trinotate.v4.0.2.simg \
 resources/pfam/Pfam-A_2025_10.hmm \
 results/annotation/trinotate/pfam \
 16
 ```
 
+##### Post-run
+```bash
+cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotation/trinotate/pfam/pfam_merged.domtblout
+```
 ⸺
 
 
