@@ -46,6 +46,8 @@ The following environment modules were loaded on the Saga cluster during analysi
 - STAR/2.7.10b-GCC-11.3.0
 - SAMtools/1.16.1-GCC-11.3.0
 - BUSCO/5.5.0-foss-2022b
+- HMMER/3.4-gompi-2023a
+- BLAST+/2.14.1-gompi-2023a
 
 #### Singularity Container for Trinity 
 The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
