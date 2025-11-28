@@ -48,6 +48,7 @@ The following environment modules were loaded on the Saga cluster during analysi
 - BUSCO/5.5.0-foss-2022b
 - HMMER/3.4-gompi-2023a
 - BLAST+/2.14.1-gompi-2023a
+- Python/3.10.8-GCCcore-12.2.0
 
 #### Singularity Container for Trinity 
 The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
@@ -411,9 +412,14 @@ results/quantification/cumulative_counts
 
 ⸺
 
-### Transcriptome Annotation
+### Transcriptome Annotation (Trinotate Pipeline)
 
-> **Note:** SignalP and TMHMM are not included in the Singularity image due to licensing restrictions. These tools were run using cluster modules and their outputs were integrated into the Trinotate pipeline during the evidence loading step.
+
+The Trinotate pipeline integrates multiple evidence sources for functional annotation, including ORF prediction, homology searches, protein domains, signal peptides, and transmembrane regions. All results are loaded into a unified SQLite database for downstream queries and reporting.
+
+**Execution details:**  
+- **SignalP and TMHMM** were downloaded directly from DTU due to licensing restrictions. They are not included in the Trinotate Singularity image and do not have cluster modules, so they were executed as standalone binaries outside the container.  
+- **Pfam and BLAST searches** were run using cluster modules instead of the container because of I/O bottlenecks encountered when using Singularity on the HPC system.
 
 [transdecoder_longorfs.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_longorfs.sh)
 
@@ -504,6 +510,45 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 ```
 ⸺
 
+Due to licencing SignalP and Tmhmm (not included in Trinotate singularity image and no mudules available in the HPC) these packages had to be downloaded from DTU and after unpacking all necessary dependancies had to be installed.
+
+#### SignalP
+
+##### Enviorment instalation after downloading and unpacking SignalP
+```bash
+# Load the correct Python module
+module load Python/3.10.8-GCCcore-12.2.0
+
+# Go to directory where signalP is installed
+cd /resources/signalp
+
+# Create a fresh virtual environment
+python3 -m venv env
+
+# Activate the environment
+source env/bin/activate
+
+# Upgrade pip (recommended)
+pip install --upgrade pip
+
+
+# Pin NumPy to a compatible version (<2)
+pip install "numpy<2"
+
+# Install SignalP from the source directory
+cd signalp6_fast/signalp-6-package
+pip install --force-reinstall .
+
+# Copy model weights
+SIGNALP_DIR=$(python3 -c "import signalp, os; print(os.path.dirname(signalp.__file__))")
+rsync -av models/ "$SIGNALP_DIR/model_weights/"
+
+
+```
+
+
+
+⸺
 
 #### trinities_filter_by_gene_cov.sh
 
