@@ -414,12 +414,15 @@ results/quantification/cumulative_counts
 
 ### Transcriptome Annotation (Trinotate Pipeline)
 
-
 The Trinotate pipeline integrates multiple evidence sources for functional annotation, including ORF prediction, homology searches, protein domains, signal peptides, and transmembrane regions. All results are loaded into a unified SQLite database for downstream queries and reporting.
 
-**Execution details:**  
-- **SignalP and TMHMM** were downloaded directly from DTU due to licensing restrictions. They are not included in the Trinotate Singularity image and do not have cluster modules, so they were executed as standalone binaries outside the container.  
-- **Pfam and BLAST searches** were run using cluster modules instead of the container because of I/O bottlenecks encountered when using Singularity on the HPC system.
+**Execution details:**
+
+- **TransDecoder Long ORFs**, **BLASTP**, and **TransDecoder Predict** were executed inside the Trinotate Singularity container.
+- **Pfam** and **BLASTX** searches were run using cluster modules instead of the container because of I/O bottlenecks encountered when using Singularity on the HPC system.
+- Both **SignalP** and **TMHMM** were downloaded from DTU due to licensing restrictions (not included in the Trinotate container and no HPC module exists for these tools).
+    - **SignalP** was executed in a dedicated Python virtual environment.
+    - **TMHMM** was containerized using Apptainer for reproducibility and portability.
 
 [transdecoder_longorfs.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_longorfs.sh)
 
@@ -546,6 +549,57 @@ rsync -av models/ "$SIGNALP_DIR/model_weights/"
 
 ```
 
+⸺
+#### TMHMM
+
+Predicts transmembrane helices in protein sequences, which is required for Trinotate annotation to identify membrane-associated proteins.
+After downloading and unpacking the tarball, TMHMM was containerized using Apptainer in local machine. It was then transfered to the HPC toguether with it's singularity image to be executed. 
+
+##### Environment Setup in local machine
+
+```bash
+# Update package list and install wget
+sudo apt-get update
+sudo apt-get install -y wget
+
+# Download Apptainer .deb package
+wget https://github.com/apptainer/apptainer/releases/download/v1.3.2/apptainer_1.3.2_amd64.deb
+
+# Install Apptainer
+sudo apt install ./apptainer_1.3.2_amd64.deb
+
+# Unpack TMHMM after download which creates tmhmm-2.0c/
+tar -xzf tmhmm-2.0c.Linux.tar.gz
+
+```
+
+Create tmhmm.def (Apptainer definition file) and place in the same directory as unpacked TMHMM files (tmhmm-2.0c/).
+Example of tmhmm.def:
+```bash
+Bootstrap: docker
+From: ubuntu:20.04
+
+%files
+    tmhmm-2.0c /tmhmm-2.0c
+
+%environment
+    export PATH=/opt/tmhmm/bin:$PATH
+
+%post
+    apt-get update && apt-get install -y perl
+    mkdir -p /opt/tmhmm
+    cp -r /tmhmm-2.0c/* /opt/tmhmm/
+    chmod +x /opt/tmhmm/bin/decodeanhmm.Linux_x86_64
+    chmod +x /opt/tmhmm/bin/tmhmm
+
+%runscript
+    exec tmhmm "$@"
+```
+Build container:
+```bash
+sudo apptainer build tmhmm.sif tmhmm.def
+```
+Transfer tmhmm.sif to HPC together with tmhmm-2.0c.Linux.tar.gz
 
 
 ⸺
