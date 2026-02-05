@@ -518,8 +518,6 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 ```
 ⸺
 
-Due to licencing SignalP and Tmhmm (not included in Trinotate singularity image and no mudules available in the HPC) these packages had to be downloaded from DTU and after unpacking all necessary dependancies had to be installed.
-
 #### SignalP
 SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Execution Overview). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file
 
@@ -540,6 +538,7 @@ bash signalp_prepare.sh <base_dir>
 bash scripts/annotation/trinotate/signalp_prepare.sh resources/signalp
 ```
 ⸺
+
 [signalp_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/tmhmm_chunking.sh)
 
 Splits a large peptide FASTA file into smaller chunks (~10,000 sequences each) to enable parallel execution on the HPC.
@@ -562,6 +561,7 @@ bash scripts/annotation/trinotate/signalp_chunking.sh \
     results/annotation/trinotate/signalp/chunks
 ```
 ⸺
+
 [signalp.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp.sh)
 
 Runs SignalP 6.0 on a single peptide FASTA chunk inside the SignalP virtual environment.
