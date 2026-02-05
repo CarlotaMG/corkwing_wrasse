@@ -81,6 +81,15 @@ singularity exec --bind $(pwd):$(pwd) resources/trinotate.v4.0.2.simg <command>
 
 For more information, see [Trinotate GitHub repository](https://github.com/Trinotate/Trinotate).
 
+#### SignalP 6.0 Environment
+SignalP 6.0 is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster. Because the tool requires a licensed DTU distribution and specific Python dependencies (including NumPy <2), it was installed in a dedicated Python virtual environment located at:
+```bash
+resources/signalp/env
+```
+The unpacked DTU package (signalp6_fast/signalp-6-package) and the original archive (signalp-6.0i.fast.tar.gz) are stored in:
+```bash
+resources/signalp/
+```
 ---
 
 ## Scripts
@@ -416,13 +425,9 @@ results/quantification/cumulative_counts
 
 The Trinotate pipeline integrates multiple evidence sources for functional annotation, including ORF prediction, homology searches, protein domains, signal peptides, and transmembrane regions. All results are loaded into a unified SQLite database for downstream queries and reporting.
 
-**Execution details:**
+#### Execution Overview
 
-- **TransDecoder Long ORFs**, **BLASTP**, and **TransDecoder Predict** were executed inside the Trinotate Singularity container.
-- **Pfam** and **BLASTX** searches were run using cluster modules instead of the container because of I/O bottlenecks encountered when using Singularity on the HPC system.
-- Both **SignalP** and **TMHMM** were downloaded from DTU due to licensing restrictions (not included in the Trinotate container and no HPC module exists for these tools).
-    - **SignalP** was executed in a dedicated Python virtual environment.
-    - **TMHMM** was containerized using Apptainer for reproducibility and portability.
+The annotation workflow combines Singularity containers, HPC modules, and external tools that require custom installation. Each component was executed in the environment best suited for performance and reproducibility:
 
 [transdecoder_longorfs.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_longorfs.sh)
 
@@ -516,38 +521,106 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 Due to licencing SignalP and Tmhmm (not included in Trinotate singularity image and no mudules available in the HPC) these packages had to be downloaded from DTU and after unpacking all necessary dependancies had to be installed.
 
 #### SignalP
+SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Execution Overview). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file
 
-##### Enviorment instalation after downloading and unpacking SignalP
+[signalp_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_prepare.sh)
+
+Creates a dedicated Python virtual environment for SignalP 6.0, installs the DTU package, and copies the model weights into the correct location inside the environment.
+
+#### Inputs
+- <base_dir>: directory for the unpacked SignalP package (signalp6_fast/signalp-6-package)
+#### Outputs
+- The fully configured virtual environment at <base_dir>/env
+#### Usage
 ```bash
-# Load the correct Python module
-module load Python/3.10.8-GCCcore-12.2.0
-
-# Go to directory where signalP is installed
-cd /resources/signalp
-
-# Create a fresh virtual environment
-python3 -m venv env
-
-# Activate the environment
-source env/bin/activate
-
-# Upgrade pip (recommended)
-pip install --upgrade pip
-
-
-# Pin NumPy to a compatible version (<2)
-pip install "numpy<2"
-
-# Install SignalP from the source directory
-cd signalp6_fast/signalp-6-package
-pip install --force-reinstall .
-
-# Copy model weights
-SIGNALP_DIR=$(python3 -c "import signalp, os; print(os.path.dirname(signalp.__file__))")
-rsync -av models/ "$SIGNALP_DIR/model_weights/"
-
-
+bash signalp_prepare.sh <base_dir>
 ```
+#### Example
+```bash
+bash scripts/annotation/trinotate/signalp_prepare.sh resources/signalp
+```
+⸺
+[signalp_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/tmhmm_chunking.sh)
+
+Splits a large peptide FASTA file into smaller chunks (~10,000 sequences each) to enable parallel execution on the HPC.
+
+#### Inputs
+- <pep_file>: peptide FASTA (e.g., longest_orfs.pep)
+- <output_dir>: directory where chunk folders will be created
+#### Outputs
+- chunk_000/chunk_000.pep
+- chunk_001/chunk_001.pep
+- … one directory per chunk
+#### Usage
+```bash
+bash signalp_chunking.sh <pep_file> <output_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/trinotate/signalp_chunking.sh \
+    results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+    results/annotation/trinotate/signalp/chunks
+```
+⸺
+[signalp.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp.sh)
+
+Runs SignalP 6.0 on a single peptide FASTA chunk inside the SignalP virtual environment.
+
+#### Inputs
+- <env_dir>: path to the SignalP virtual environment
+- <pep_fasta>: peptide FASTA chunk
+- <output_dir>: directory for SignalP output
+- <threads>: number of CPU threads
+#### Outputs
+- prediction_results.txt
+- region_output.gff3
+#### Usage
+```bash
+bash signalp.sh <env_dir> <pep_fasta> <output_dir> <threads>
+```
+#### Example(SLURM array job)
+```bash
+# List all chunk FASTA files
+CHUNKS=(results/annotation/trinotate/signalp/chunks/chunk_*/chunk_*.pep)
+
+# Select the chunk for this array index
+PEP_FASTA=${CHUNKS[$SLURM_ARRAY_TASK_ID]}
+
+# Define output directory for this chunk
+OUT_DIR=$(dirname "$PEP_FASTA")/signalp_out
+
+# Run SignalP
+bash scripts/annotation/trinotate/signalp.sh \
+    resources/signalp/env \
+    "$PEP_FASTA" \
+    "$OUT_DIR" \
+    $SLURM_CPUS_PER_TASK
+```
+⸺
+
+[signalp_merge.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_merge.sh)
+
+Combines all per‑chunk SignalP outputs into a single merged file suitable for loading into Trinotate.
+This script expects each chunk directory to contain a signalp_out/ folder produced by signalp.sh.
+
+#### Inputs
+- <chunks_dir>: directory containing chunk_*/signalp_out/
+- <merged_dir>: directory where merged output files will be written
+#### Outputs
+- signalp_merged.prediction_results.txt
+- signalp_merged.region_output.gff3
+#### Usage
+```bash
+bash signalp_merge.sh <chunks_dir> <merged_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/trinotate/signalp_merge.sh \
+    results/annotation/trinotate/signalp/chunks \
+    results/annotation/trinotate/signalp/merged
+```
+
+
 
 ⸺
 #### TMHMM
