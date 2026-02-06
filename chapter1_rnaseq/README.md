@@ -667,7 +667,7 @@ The script creates a job‑specific directory on node‑local scratch ($LOCALSCR
 - <pep_fasta>: peptide FASTA chunk
 - <output_dir>: directory for DeepTMHMM output
 - <image.sif>: DeepTMHMM Apptainer image
-- [PURGE_EMBEDDINGS]: optional (default: 1)
+- <purge_embedings>: optional (default: 1)
 #### Outputs
 - deeptmhmm_out/biolib_results/predicted_topologies.3line
 - deeptmhmm_out/biolib_results/TMRs.gff3
