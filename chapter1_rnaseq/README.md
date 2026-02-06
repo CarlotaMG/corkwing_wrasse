@@ -525,7 +525,7 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 ⸺
 
 #### SignalP
-SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Execution Overview). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file.
+SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Working Environment section above). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file.
 
 [signalp_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_prepare.sh)
 
@@ -629,7 +629,7 @@ bash scripts/annotation/trinotate/signalp_merge.sh \
 ⸺
 
 ### DeepTMHMM
-DeepTMHMM was used to predict transmembrane helices in the translated ORFs. Because the dataset was large and the workflow was executed on the Saga (Sigma2) cluster, the peptide FASTA was processed in chunks using SLURM array jobs. Per‑chunk outputs were then merged and converted into a standardized GFF3 file for downstream processing.
+DeepTMHMM was used to predict transmembrane helices in the translated ORFs. Because the dataset was large and the workflow was executed on the Saga cluster, the peptide FASTA was processed in chunks using SLURM array jobs. Per‑chunk outputs were then merged and converted into a standardized GFF3 file for downstream processing.
 
 [tmhmm_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/tmhmm_chunking.sh)
 
@@ -660,7 +660,7 @@ bash scripts/annotation/trinotate/tmhmm_chunking.sh \
 
 [deeptmhmm_exec.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/deeptmhmm_exec.sh)
 
-Runs DeepTMHMM on a single peptide FASTA chunk using an Apptainer container.
+Runs DeepTMHMM on a single peptide FASTA chunk using an Apptainer container (see Working Environment section above).
 The script creates a job‑specific directory on node‑local scratch ($LOCALSCRATCH if allocated, otherwise /tmp) and binds this directory into the container for DeepTMHMM’s temporary files and embeddings
 
 #### Inputs
