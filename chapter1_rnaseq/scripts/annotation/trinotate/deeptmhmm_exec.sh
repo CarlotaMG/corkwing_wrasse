@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# Usage: deeptmhmm_exec.sh <pep_file> <output_dir> <image.sif> [PURGE_EMBEDDINGS(0|1)]
-# Examples:
-#   bash deeptmhmm_exec.sh chunk_000/chunk_000.pep chunk_000 /path/to/deeptmhmm_offline.sif
-#   bash deeptmhmm_exec.sh chunk_000/chunk_000.pep chunk_000 /path/to/deeptmhmm_offline.sif 0   # keep embeddings
-#
-# Behavior:
-# - Default PURGE_EMBEDDINGS=1: embeddings remain on node-local scratch and are NOT copied to shared storage.
-# - If PURGE_EMBEDDINGS=0: embeddings are copied to <output_dir>/deeptmhmm_tmp/embeddings.
-# - Optional REMOVE_TMP_ON_SUCCESS=1 (env var): if set and you kept embeddings, delete deeptmhmm_tmp at the end.
 
 set -euo pipefail
+
 PEP_FILE="${1:?FASTA (.pep) file required}"
 OUT_DIR="${2:?Output directory required}"
 SIF="${3:?Singularity image required}"

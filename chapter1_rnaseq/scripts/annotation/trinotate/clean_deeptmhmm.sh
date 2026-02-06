@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Convert DeepTMHMM "GFF-like" 4-column output to valid 9-column GFF3
-# Keeps only TMhelix features (alpha-helical), drops inside/outside
-# Usage: bash clean_deeptmhmm.sh IN_GFF OUT_GFF
 
 set -euo pipefail
 

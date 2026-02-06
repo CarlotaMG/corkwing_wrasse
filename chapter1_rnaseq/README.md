@@ -11,7 +11,7 @@ Transcript extraction is organized into three tiers to capture different aspects
 This chapter includes:
 
 - Guided de novo transcriptome assembly using Trinity
-- Transcript annotation using Trinotate and genome-based GFF integration
+- Transcript annotation with Trinotate, EggNog, InterProScan and Genome-Based GFF Integration
 - PCA and clustering to visualize sample structure
 - Model comparison to evaluate differential expression patterns and select models for transcript extraction across tiers
 - Differential expression analyses across temperature treatments and pedigrees using DESeq2
@@ -39,7 +39,7 @@ This analysis was conducted in a mixed computational environment combining HPC m
 Transcriptome assembly and annotation steps were performed each within their own Singularity container to ensure reproducibility and consistent software environments.
 
 #### HPC Modules
-The following environment modules were loaded on the Saga cluster during analysis:
+The following environment modules were loaded on Saga (Sigma2 cluster) during analysis:
 - FastQC/0.12.1-Java-11
 - MultiQC/1.22.3-foss-2023b
 - Trimmomatic/0.39-Java-11
@@ -82,14 +82,20 @@ singularity exec --bind $(pwd):$(pwd) resources/trinotate.v4.0.2.simg <command>
 For more information, see [Trinotate GitHub repository](https://github.com/Trinotate/Trinotate).
 
 #### SignalP 6.0 Environment
-SignalP 6.0 is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster. Because the tool requires a licensed DTU distribution and specific Python dependencies (including NumPy <2), it was installed in a dedicated Python virtual environment located at:
+SignalP 6.0 is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster. Because the tool requires a licensed DTU distribution and specific Python dependencies (including NumPy <2), it was installed in a dedicated Python virtual environment.
+The SignalP 6.0 archive (signalp-6.0i.fast.tar.gz) was obtained from the DTU Health Tech download portal after accepting the academic license agreement and unpacked into a local directory. The unpacked DTU package (signalp6_fast/signalp-6-package) is used by the installation script:
 ```bash
-resources/signalp/env
+scripts/annotation/trinotate/signalp_prepare.sh
 ```
-The unpacked DTU package (signalp6_fast/signalp-6-package) and the original archive (signalp-6.0i.fast.tar.gz) are stored in:
+
+#### DeepTMHMM Environment
+Trinotate was originally designed to integrate TMHMM, not DeepTMHMM. However, TMHMM is no longer maintained and has been superseded by DeepTMHMM, which provides substantially improved accuracy using modern deep‑learning methods. For this reason, DeepTMHMM was used instead of TMHMM in this workflow.
+DeepTMHMM is implemented in Python and depends on PyTorch and OpenProtein, which are not available inside the Trinotate container and cannot be added without rebuilding it from scratch. Although the DeepTMHMM codebase is open‑source (MIT license), the Docker images commonly used to run it cannot be redistributed inside third‑party containers such as Trinotate. In addition, Saga does not allow Docker pulls or Docker‑based builds, so the Apptainer image must be created on a local machine and transferred to the cluster.
+The DeepTMHMM Apptainer image used in this project was built locally from the Docker image docker.io/biswasaneel/deeptmhmm:latest using Apptainer’s Docker bootstrap mechanism (January 2026) and then copied to Saga for offline use. To reproduce the environment, the image can be rebuilt using:
 ```bash
-resources/signalp/
+apptainer build deeptmhmm_offline.sif docker://docker.io/biswasaneel/deeptmhmm:latest
 ```
+
 ---
 
 ## Scripts
@@ -519,7 +525,7 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 ⸺
 
 #### SignalP
-SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on the Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Execution Overview). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file
+SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Execution Overview). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file.
 
 [signalp_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_prepare.sh)
 
@@ -620,59 +626,101 @@ bash scripts/annotation/trinotate/signalp_merge.sh \
     results/annotation/trinotate/signalp/merged
 ```
 
+⸺
 
+### DeepTMHMM
+DeepTMHMM was used to predict transmembrane helices in the translated ORFs. Because the dataset was large and the workflow was executed on the Saga (Sigma2) cluster, the peptide FASTA was processed in chunks using SLURM array jobs. Per‑chunk outputs were then merged and converted into a standardized GFF3 file for downstream processing.
+
+[tmhmm_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/tmhmm_chunking.sh)
+
+Splits a large peptide FASTA file into smaller chunks without breaking FASTA records.
+Chunk size is controlled by a maximum byte threshold.
+
+#### Inputs
+- <pep_file>: peptide FASTA (e.g., longest_orfs.pep)
+- <output_dir>: directory where chunk folders will be created
+- <max_bytes>: maximum size per chunk (e.g., 5 000 000)
+#### Outputs
+- chunk_000/chunk_000.pep
+- chunk_001/chunk_001.pep
+- … one directory per chunk
+#### Usage
+```bash
+bash tmhmm_chunking.sh <pep_file> <output_dir> <max_bytes>
+```
+#### Example
+```bash
+bash scripts/annotation/trinotate/tmhmm_chunking.sh \
+    results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+    results/annotation/trinotate/tmhmm/chunks \
+    5000000
+```
 
 ⸺
-#### TMHMM
 
-Predicts transmembrane helices in protein sequences, which is required for Trinotate annotation to identify membrane-associated proteins.
-After downloading and unpacking the tarball, TMHMM was containerized using Apptainer in local machine. It was then transfered to the HPC toguether with it's singularity image to be executed. 
+[deeptmhmm_exec.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/deeptmhmm_exec.sh)
 
-##### Environment Setup in local machine
+Runs DeepTMHMM on a single peptide FASTA chunk using an Apptainer container.
+The script creates a job‑specific directory on node‑local scratch ($LOCALSCRATCH if allocated, otherwise /tmp) and binds this directory into the container for DeepTMHMM’s temporary files and embeddings
 
+#### Inputs
+- <pep_fasta>: peptide FASTA chunk
+- <output_dir>: directory for DeepTMHMM output
+- <image.sif>: DeepTMHMM Apptainer image
+- [PURGE_EMBEDDINGS]: optional (default: 1)
+#### Outputs
+- deeptmhmm_out/biolib_results/predicted_topologies.3line
+- deeptmhmm_out/biolib_results/TMRs.gff3
+- (optional) embeddings if PURGE_EMBEDDINGS=0
+#### Usage
 ```bash
-# Update package list and install wget
-sudo apt-get update
-sudo apt-get install -y wget
+bash deeptmhmm_exec.sh <pep_fasta> <output_dir> <image.sif>
+```
+#### Example(SLURM array job)
+```bash
+# Format array index to match chunk naming
+TASK_ID=$(printf "%03d" "$SLURM_ARRAY_TASK_ID")
 
-# Download Apptainer .deb package
-wget https://github.com/apptainer/apptainer/releases/download/v1.3.2/apptainer_1.3.2_amd64.deb
+# Define input FASTA and output directory for this chunk
+PEP_FILE="results/annotation/trinotate/tmhmm/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.pep"
+OUT_DIR="results/annotation/trinotate/tmhmm/chunks/chunk_${TASK_ID}"
 
-# Install Apptainer
-sudo apt install ./apptainer_1.3.2_amd64.deb
-
-# Unpack TMHMM after download which creates tmhmm-2.0c/
-tar -xzf tmhmm-2.0c.Linux.tar.gz
-
+# Run DeepTMHMM
+bash scripts/annotation/trinotate/deeptmhmm_exec.sh \
+    "$PEP_FILE" \
+    "$OUT_DIR" \
+    resources/deeptmhmm/deeptmhmm_offline.sif
 ```
 
-Create tmhmm.def (Apptainer definition file) and place in the same directory as unpacked TMHMM files (tmhmm-2.0c/).
-Example of tmhmm.def:
+After all array tasks finished, all per‑chunk DeepTMHMM outputs were merged into a single file:
 ```bash
-Bootstrap: docker
-From: ubuntu:20.04
-
-%files
-    tmhmm-2.0c /tmhmm-2.0c
-
-%environment
-    export PATH=/opt/tmhmm/bin:$PATH
-
-%post
-    apt-get update && apt-get install -y perl
-    mkdir -p /opt/tmhmm
-    cp -r /tmhmm-2.0c/* /opt/tmhmm/
-    chmod +x /opt/tmhmm/bin/decodeanhmm.Linux_x86_64
-    chmod +x /opt/tmhmm/bin/tmhmm
-
-%runscript
-    exec tmhmm "$@"
+cat results/annotation/trinotate/tmhmm/chunks/*/deeptmhmm_out/biolib_results/TMRs.gff3 \
+    > results/annotation/trinotate/tmhmm/tmhmm_all.gff3
 ```
-Build container:
+
+[clean_deeptmhmm.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/clean_deeptmhmm.sh)
+
+Converts the merged DeepTMHMM output into a valid 9‑column GFF3 file.
+This script removes repeated headers, filters out non‑TMhelix states, and adds stable feature IDs and metadata.
+
+#### Inputs
+- <input_gff>: merged DeepTMHMM output (e.g., tmhmm_all.gff3)
+#### Outputs
+- <output_gff>: cleaned GFF3 file containing only TMhelix features
+(e.g., tmhmm_clean.gff3)
+#### Usage
 ```bash
-sudo apptainer build tmhmm.sif tmhmm.def
+bash clean_deeptmhmm.sh <input_gff> <output_gff>
 ```
-Transfer tmhmm.sif to HPC together with tmhmm-2.0c.Linux.tar.gz
+#### Example
+```bash
+bash scripts/annotation/trinotate/clean_deeptmhmm.sh \
+    results/annotation/trinotate/tmhmm/tmhmm_all.gff3 \
+    results/annotation/trinotate/tmhmm/tmhmm_clean.gff3
+```
+
+> **Note:** DeepTMHMM output is not compatible with the TMHMM 2.0 format expected by Trinotate, so it cannot be loaded directly into the Trinotate database. A cleaned GFF3 file was generated with the intention of integrating DeepTMHMM predictions into the final Trinotate report, but this integration did not succeed. The DeepTMHMM predictions will instead be incorporated after Trinotate’s report generation during the downstream analysis stage.
+
 
 
 ⸺
