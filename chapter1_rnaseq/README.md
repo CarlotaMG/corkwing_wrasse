@@ -529,7 +529,7 @@ cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotatio
 
 Runs TransDecoder.Predict to identify the most likely coding regions in the Trinity transcriptome using Trinotate’s Singularity image.
 This step uses ORF hinting, incorporating both BLASTP and Pfam results to retain ORFs supported by homology evidence.
-Because ORF hinting requires BLASTP and Pfam results, this step is executed after BLASTP and Pfam, and before all downstream annotation tools.
+Because ORF hinting requires BLASTP and Pfam results, this step is executed after BLASTP and Pfam.
 The script also symlinks the outputs from the TransDecoder.LongOrfs step into the working directory so that TransDecoder.Predict can access the ORF candidates.
 
 #### Inputs
@@ -561,6 +561,70 @@ bash scripts/annotation/trinotate/transdecoder_predict.sh \
     results/annotation/trinotate/pfam/pfam_merged.domtblout \
     results/annotation/trinotate/transdecoder_predict \
     2
+```
+
+⸺
+
+#### BLASTX
+
+BLASTX was used to search the Trinity transcriptome against the SwissProt protein database using the BLAST+ module available on the Saga cluster. Because the dataset was large, the transcriptome FASTA was processed in chunks using SLURM array jobs. Per‑chunk BLASTX outputs were then merged into a single file for Trinotate
+
+[blastx_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/blastx_chunking.sh)
+
+Splits a large transcriptome FASTA file into smaller chunks without breaking FASTA records. Chunk size is controlled by a maximum byte threshold.
+
+#### Inputs
+- Transcriptome FASTA file (e.g., Trinity-GG.fasta)
+#### Outputs
+- chunk_000/chunk_000.fasta
+- chunk_001/chunk_001.fasta
+- … one directory per chunk
+#### Usage
+```bash
+bash blastx_chunking.sh <fasta_file> <output_dir> <max_bytes>
+```
+#### Example
+```bash
+bash scripts/annotation/trinotate/blastx_chunking.sh \
+    results/assembly/trinity/Trinity-GG.fasta \
+    results/annotation/trinotate/blastx/chunks \
+    5000000
+```
+
+[blastx_localcopy.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/blastx_localcopy.sh)
+
+Runs BLASTX on a single transcript FASTA chunk. If node‑local scratch storage is available, the BLAST database is copied there for faster access, avoiding I/O bottlenecks.
+
+#### Inputs
+- Transcript FASTA (e.g., chunk_002.fa)
+- SwissProt BLAST database (e.g., uniprot_sprot_2025_10)
+#### Outputs
+- BLASTX results for the chunk (e.g., chunk_002.blastx)
+#### Usage
+```bash
+bash blastx_localcopy.sh <fasta_chunk> <blast_db> <output_file> <threads>
+```
+#### Example(SLURM array job)
+```bash
+# Format array index to match chunk naming
+TASK_ID=$(printf "%03d" "$SLURM_ARRAY_TASK_ID")
+
+# Define input FASTA and output file for this chunk
+CHUNK="results/annotation/trinotate/blastx/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.fa"
+OUT="results/annotation/trinotate/blastx/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.blastx"
+DB="resources/uniprot_sprot/uniprot_sprot_2025_10"
+
+# Run BLASTX
+bash scripts/annotation/trinotate/blastx_localcopy.sh \
+    "$CHUNK" \
+    "$DB" \
+    "$OUT" \
+    "$SLURM_CPUS_PER_TASK"
+```
+After all array tasks finished, all per‑chunk BLASTX outputs were merged into a single file:
+```bash
+cat results/annotation/trinotate/blastx/chunks/*/*.blastx \
+    > results/annotation/trinotate/blastx/merged.blastx
 ```
 
 ⸺
