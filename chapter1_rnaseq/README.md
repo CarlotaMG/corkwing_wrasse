@@ -437,7 +437,7 @@ The annotation workflow combines Singularity containers, HPC modules, and extern
 
 [transdecoder_longorfs.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_longorfs.sh)
 
-Identifies long open reading frames (ORFs) in Trinity-assembled transcripts and links them to gene IDs. The script accepts four arguments: the transcriptome FASTA file, the gene-transcript mapping file, the Singularity image, and the output directory.
+Identifies long open reading frames (ORFs) in Trinity-assembled transcripts and links them to gene IDs. The script accepts four arguments: the transcriptome FASTA file, the gene-transcript mapping file, Trinotate's Singularity image, and the output directory.
 ##### Inputs
 - Trinity transcriptome FASTA file (Trinity-GG.fasta)
 - Gene-to-transcript mapping file (Trinity-GG.fasta.gene_trans_map)
@@ -522,6 +522,47 @@ results/annotation/trinotate/pfam \
 ```bash
 cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotation/trinotate/pfam/pfam_merged.domtblout
 ```
+
+⸺
+
+[transdecoder_predict.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/transdecoder_predict.sh)
+
+Runs TransDecoder.Predict to identify the most likely coding regions in the Trinity transcriptome using Trinotate’s Singularity image.
+This step uses ORF hinting, incorporating both BLASTP and Pfam results to retain ORFs supported by homology evidence.
+Because ORF hinting requires BLASTP and Pfam results, this step is executed after BLASTP and Pfam, and before all downstream annotation tools.
+The script also symlinks the outputs from the TransDecoder.LongOrfs step into the working directory so that TransDecoder.Predict can access the ORF candidates.
+
+#### Inputs
+- Trinity transcriptome FASTA file (e.g., Trinity-GG.fasta)
+- BLASTP results used as ORF hints (blastp.outfmt6)
+- Pfam domain table used as ORF hints (pfam_merged.domtblout)
+- LongOrfs outputs (longest_orfs.pep, longest_orfs.gff3) — symlinked automatically
+#### Outputs
+- Final predicted peptide sequences (transdecoder.pep)
+- Predicted coding sequences (transdecoder.cds)
+- Coding‑region annotations in GFF3 format (transdecoder.gff3)
+- ORF coordinates in BED format (transdecoder.bed)
+#### Usage
+```bash
+bash transdecoder_predict.sh \
+    <fasta_file> \
+    <singularity_image> \
+    <blastp_hits> \
+    <pfam_hits> \
+    <output_dir> \
+    <threads>
+```
+#### Example
+```bash 
+bash scripts/annotation/trinotate/transdecoder_predict.sh \
+    results/assembly/trinity/Trinity-GG.fasta \
+    resources/trinotate.v4.0.2.simg \
+    results/annotation/trinotate/blastp/blastp.outfmt6 \
+    results/annotation/trinotate/pfam/pfam_merged.domtblout \
+    results/annotation/trinotate/transdecoder_predict \
+    2
+```
+
 ⸺
 
 #### SignalP
