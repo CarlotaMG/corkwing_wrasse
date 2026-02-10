@@ -96,6 +96,55 @@ The DeepTMHMM Apptainer image used in this project was built locally from the Do
 apptainer build deeptmhmm_offline.sif docker://docker.io/biswasaneel/deeptmhmm:latest
 ```
 
+#### Trinotate Data Resources
+Trinotate requires several external data sources for functional annotation.
+In this workflow, all Trinotate‑specific data preparation was performed at the end of the pipeline, immediately before running the final Trinotate loading and report‑generation step.
+These resources were stored in a dedicated directory:
+```bash
+DATA_DIR=results/annotation/trinotate/trinotate_data/
+```
+Most of the required databases are automatically placed into this directory by the Trinotate container during the annotation process.
+This includes:
+- Pfam‑A HMM database
+- SwissProt protein database
+- GO ontology
+- pfam2go mapping file
+- Trinotate boilerplate SQLite database
+Two additional resources — EggNOG v5 annotation table and Rfam covariance models —
+had to be manually downloaded into the same directory, as they are not bundled with the Trinotate container:
+```bash
+cd "$DATA_DIR"
+
+# EggNOG v5 annotation table
+if [[ ! -s "e5.og_annotations.tsv.gz" ]]; then
+    wget -O e5.og_annotations.tsv \
+        "http://eggnog5.embl.de/download/eggnog_5.0/e5.og_annotations.tsv"
+    gzip e5.og_annotations.tsv
+fi
+ln -sf e5.og_annotations.tsv.gz NOG.annotations.tsv.gz
+
+# Rfam covariance models
+if [[ ! -s "Rfam.cm" ]]; then
+    wget -O Rfam.cm.gz \
+        https://ftp.ebi.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz
+    gunzip Rfam.cm.gz
+    cmpress Rfam.cm
+fi
+```
+In addition, two small adjustments were required during the final Trinotate loading and report‑generation step to ensure that the EggNOG annotation file was accessible in the working directory and that the SQLite database was correctly initialised:
+```bash
+# Ensure EggNOG annotation file is visible in the Trinotate working directory
+cd "$OUT_DIR"
+ln -sf ../trinotate_data/e5.og_annotations.tsv.gz NOG.annotations.tsv.gz
+
+# Seed the Trinotate database if the container fails to initialise it
+if [[ ! -s "$OUT_DIR/Trinotate.sqlite" ]] || \
+   ! sqlite3 "$OUT_DIR/Trinotate.sqlite" 'SELECT COUNT(*) FROM Transcript;' >/dev/null 2>&1; then
+  rm -f "$OUT_DIR/Trinotate.sqlite"
+  cp "$DATA_DIR/TrinotateBoilerplate.sqlite" "$OUT_DIR/Trinotate.sqlite"
+  chmod 664 "$OUT_DIR/Trinotate.sqlite"
+fi
+```
 ---
 
 ## Scripts
@@ -637,7 +686,7 @@ SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because 
 Creates a dedicated Python virtual environment for SignalP 6.0, installs the DTU package, and copies the model weights into the correct location inside the environment.
 
 #### Inputs
-- <base_dir>: directory for the unpacked SignalP package (signalp6_fast/signalp-6-package)
+- Base directory containing the unpacked SignalP package (e.g., signalp6_fast/signalp-6-package)
 #### Outputs
 - The fully configured virtual environment at <base_dir>/env
 #### Usage
@@ -655,8 +704,7 @@ bash scripts/annotation/trinotate/signalp_prepare.sh resources/signalp
 Splits a large peptide FASTA file into smaller chunks (~10,000 sequences each) to enable parallel execution on the HPC.
 
 #### Inputs
-- <pep_file>: peptide FASTA (e.g., longest_orfs.pep)
-- <output_dir>: directory where chunk folders will be created
+- Peptide FASTA file (e.g., longest_orfs.pep)
 #### Outputs
 - chunk_000/chunk_000.pep
 - chunk_001/chunk_001.pep
@@ -678,13 +726,11 @@ bash scripts/annotation/trinotate/signalp_chunking.sh \
 Runs SignalP 6.0 on a single peptide FASTA chunk inside the SignalP virtual environment.
 
 #### Inputs
-- <env_dir>: path to the SignalP virtual environment
-- <pep_fasta>: peptide FASTA chunk
-- <output_dir>: directory for SignalP output
-- <threads>: number of CPU threads
+- Path to the SignalP virtual environment (e.g., resources/signalp/env)
+- Peptide FASTA chunk (e.g., chunk_002.pep)
 #### Outputs
-- prediction_results.txt
-- region_output.gff3
+- SignalP prediction results (prediction_results.txt)
+- SignalP region annotations (region_output.gff3)
 #### Usage
 ```bash
 bash signalp.sh <env_dir> <pep_fasta> <output_dir> <threads>
@@ -715,11 +761,11 @@ Combines all per‑chunk SignalP outputs into a single merged file suitable for 
 This script expects each chunk directory to contain a signalp_out/ folder produced by signalp.sh.
 
 #### Inputs
-- <chunks_dir>: directory containing chunk_*/signalp_out/
-- <merged_dir>: directory where merged output files will be written
+- Directory containing chunk folders with SignalP output (e.g., signalp/chunks/)
+- Directory for merged output files (e.g., signalp/)
 #### Outputs
-- signalp_merged.prediction_results.txt
-- signalp_merged.region_output.gff3
+- Merged SignalP prediction results (signalp_merged.prediction_results.txt)
+- Merged SignalP region annotations (signalp_merged.region_output.gff3)
 #### Usage
 ```bash
 bash signalp_merge.sh <chunks_dir> <merged_dir>
@@ -742,9 +788,8 @@ Splits a large peptide FASTA file into smaller chunks without breaking FASTA rec
 Chunk size is controlled by a maximum byte threshold.
 
 #### Inputs
-- <pep_file>: peptide FASTA (e.g., longest_orfs.pep)
-- <output_dir>: directory where chunk folders will be created
-- <max_bytes>: maximum size per chunk (e.g., 5 000 000)
+- Peptide FASTA file (e.g., longest_orfs.pep)
+- Maximum chunk size in bytes (e.g., 5 000 000)
 #### Outputs
 - chunk_000/chunk_000.pep
 - chunk_001/chunk_001.pep
@@ -769,14 +814,13 @@ Runs DeepTMHMM on a single peptide FASTA chunk using an Apptainer container (see
 The script creates a job‑specific directory on node‑local scratch ($LOCALSCRATCH if allocated, otherwise /tmp) and binds this directory into the container for DeepTMHMM’s temporary files and embeddings
 
 #### Inputs
-- <pep_fasta>: peptide FASTA chunk
-- <output_dir>: directory for DeepTMHMM output
-- <image.sif>: DeepTMHMM Apptainer image
-- <purge_embedings>: optional (default: 1)
+- Peptide FASTA chunk (e.g., chunk_002.pep)
+- DeepTMHMM Apptainer image (e.g., deeptmhmm_offline.sif)
+
 #### Outputs
-- deeptmhmm_out/biolib_results/predicted_topologies.3line
-- deeptmhmm_out/biolib_results/TMRs.gff3
-- (optional) embeddings if PURGE_EMBEDDINGS=0
+- Predicted topologies (predicted_topologies.3line)
+- Transmembrane region annotations (TMRs.gff3)
+- (Optional) embeddings if PURGE_EMBEDDINGS=0
 #### Usage
 ```bash
 bash deeptmhmm_exec.sh <pep_fasta> <output_dir> <image.sif>
@@ -809,10 +853,9 @@ Converts the merged DeepTMHMM output into a valid 9‑column GFF3 file.
 This script removes repeated headers, filters out non‑TMhelix states, and adds stable feature IDs and metadata.
 
 #### Inputs
-- <input_gff>: merged DeepTMHMM output (e.g., tmhmm_all.gff3)
+- Merged DeepTMHMM output (e.g., tmhmm_all.gff3)
 #### Outputs
-- <output_gff>: cleaned GFF3 file containing only TMhelix features
-(e.g., tmhmm_clean.gff3)
+- Cleaned GFF3 file containing only TMhelix features (e.g., tmhmm_clean.gff3)
 #### Usage
 ```bash
 bash clean_deeptmhmm.sh <input_gff> <output_gff>
@@ -825,8 +868,6 @@ bash scripts/annotation/trinotate/clean_deeptmhmm.sh \
 ```
 
 > **Note:** DeepTMHMM output is not compatible with the TMHMM 2.0 format expected by Trinotate, so it cannot be loaded directly into the Trinotate database. A cleaned GFF3 file was generated with the intention of integrating DeepTMHMM predictions into the final Trinotate report, but this integration did not succeed. The DeepTMHMM predictions will instead be incorporated after Trinotate’s report generation during the downstream analysis stage.
-
-
 
 ⸺
 
