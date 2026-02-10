@@ -113,6 +113,7 @@ This includes:
 - GO ontology
 - pfam2go mapping file
 - Trinotate boilerplate SQLite database
+
 Two additional resources — EggNOG v5 annotation table and Rfam covariance models —
 had to be manually downloaded into the same directory, as they are not bundled with the Trinotate container:
 ```bash
