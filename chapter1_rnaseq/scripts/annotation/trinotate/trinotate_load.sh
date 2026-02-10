@@ -64,7 +64,7 @@ exec_in_sing "cd '$OUT_DIR' && '$TRINOTATE' --db '$DB' --LOAD_signalp           
 exec_in_sing "cd '$OUT_DIR' && '$TRINOTATE' --db '$DB' --LOAD_deeptmhmm         '$TMHMM_GFF'"
 
 ########################
-# Final report (robust)
+# Final report
 ########################
 echo "[$(date)] Generating final Trinotate report..."
 
