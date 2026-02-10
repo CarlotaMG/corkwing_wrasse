@@ -875,6 +875,60 @@ bash scripts/annotation/trinotate/clean_deeptmhmm.sh \
 
 ⸺
 
+[trinotate_load.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/trinotate_load.sh)
+
+Loads all functional‑annotation evidence into a unified Trinotate SQLite database and generates the final annotation report.
+This script is the final step of the Trinotate pipeline and integrates all upstream results (TransDecoder, BLASTP, BLASTX, Pfam, SignalP, DeepTMHMM) into a single database.
+It runs entirely inside the Trinotate Singularity container and performs database initialization, evidence loading, dynamic report‑flag detection, and final report generation.
+This script assumes that the required Trinotate data resources (EggNOG, Rfam, and the container‑generated Pfam/SwissProt/GO files) have already been prepared in data_dir, as described in the Working Environment section.
+
+#### Inputs
+- Trinotate Singularity image (trinotate.v4.0.2.simg)
+- Gene‑to‑transcript mapping file (Trinity-GG.fasta.gene_trans_map)
+- Trinity transcriptome FASTA (Trinity-GG.fasta)
+- Predicted peptides from TransDecoder (Trinity-GG.fasta.transdecoder.pep)
+- BLASTP results (blastp.outfmt6)
+- BLASTX results (merged.blastx)
+- Pfam domain table (pfam_merged.domtblout)
+- SignalP predictions (signalp_merged.prediction_results.txt)
+- DeepTMHMM predictions (tmhmm_clean.gff3)
+- Output directory (trinotate_final/)
+- Data directory containing Trinotate resources (trinotate_data/)
+#### Outputs
+- Trinotate SQLite database (Trinotate.sqlite)
+- Final annotation report (trinotate_annotation_report.xls)
+#### Usage
+```bash
+bash scripts/annotation/trinotate/trinotate_load.sh \
+    <singularity_image> \
+    <gene_trans_map> \
+    <transcripts_fasta> \
+    <pep_file> \
+    <blastp_outfmt6> \
+    <blastx_out> \
+    <pfam_domtblout> \
+    <signalp_results> \
+    <tmhmm_gff3> \
+    <output_dir> \
+    <data_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/trinotate/trinotate_load.sh \
+    resources/trinotate.v4.0.2.simg \
+    results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
+    results/assembly/trinity/Trinity-GG.fasta \
+    results/annotation/trinotate/transdecoder_predict/Trinity-GG.fasta.transdecoder.pep \
+    results/annotation/trinotate/blastp/blastp.outfmt6 \
+    results/annotation/trinotate/blastx/merged.blastx \
+    results/annotation/trinotate/pfam/pfam_merged.domtblout \
+    results/annotation/trinotate/signalp/signalp_merged.prediction_results.txt \
+    results/annotation/trinotate/tmhmm/tmhmm_clean.gff3 \
+    results/annotation/trinotate/trinotate_final \
+    results/annotation/trinotate/trinotate_data
+```
+⸺
+
 #### trinities_filter_by_gene_cov.sh
 
 This script filters Trinity-assembled transcripts based on their overlap with gene annotations from a custom GFF3 file (`fSymMel2.gff.gz`) for *Symphodus melops*.
