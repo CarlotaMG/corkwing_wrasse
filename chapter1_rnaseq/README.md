@@ -98,12 +98,15 @@ apptainer build deeptmhmm_offline.sif docker://docker.io/biswasaneel/deeptmhmm:l
 
 #### Trinotate Data Resources
 Trinotate requires several external data sources for functional annotation.
-In this workflow, all Trinotate‑specific data preparation was performed at the end of the pipeline, immediately before running the final Trinotate loading and report‑generation step.
-These resources were stored in a dedicated directory:
+The data resources needed for the final Trinotate loading and report‑generation were stored in a dedicated directory:
 ```bash
 DATA_DIR=results/annotation/trinotate/trinotate_data/
 ```
-Most of the required databases are automatically placed into this directory by the Trinotate container during the annotation process.
+All outputs from the final Trinotate loading and report‑generation step were written to the following directory:
+```bash
+OUT_DIR=results/annotation/trinotate/trinotate_final/
+```
+During annotation, the Trinotate container automatically populates most required databases into DATA_DIR.
 This includes:
 - Pfam‑A HMM database
 - SwissProt protein database
