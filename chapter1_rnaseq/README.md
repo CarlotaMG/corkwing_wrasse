@@ -877,10 +877,8 @@ bash scripts/annotation/trinotate/clean_deeptmhmm.sh \
 
 [trinotate_load.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/trinotate_load.sh)
 
-Loads all functional‑annotation evidence into a unified Trinotate SQLite database and generates the final annotation report.
-This script is the final step of the Trinotate pipeline and integrates all upstream results (TransDecoder, BLASTP, BLASTX, Pfam, SignalP, DeepTMHMM) into a single database.
-It runs entirely inside the Trinotate Singularity container and performs database initialization, evidence loading, dynamic report‑flag detection, and final report generation.
-This script assumes that the manually required Trinotate data resources (EggNOG and Rfam) have already been prepared in data_dir, as described in the Working Environment section. Other core resources (Pfam, SwissProt, GO, and related indices) are provided automatically by the Trinotate container.
+Loads all functional‑annotation evidence into a unified Trinotate SQLite database and generates the main Trinotate annotation report. This script integrates all upstream results (TransDecoder, BLASTP, BLASTX, Pfam, SignalP, DeepTMHMM) into the database and runs entirely inside the Trinotate Singularity container. It performs database initialization, evidence loading, dynamic report‑flag detection, and report generation.
+This script assumes that the manually required Trinotate data resources (EggNOG and Rfam) have already been prepared in data_dir, as described in the Working Environment section.
 #### Inputs
 - Trinotate Singularity image (trinotate.v4.0.2.simg)
 - Gene‑to‑transcript mapping file (Trinity-GG.fasta.gene_trans_map)
