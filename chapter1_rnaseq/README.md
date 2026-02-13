@@ -1082,7 +1082,7 @@ Chunks are created based on a maximum number of sequences per chunk (default: 32
 - chunk_001/chunk_001.pep
 - … one directory per chunk
 #### Usage
-````bash
+```bash
 bash ips_chunking.sh <pep_file> <chunks_dir> [chunk_size]
 ```
 #### Example
