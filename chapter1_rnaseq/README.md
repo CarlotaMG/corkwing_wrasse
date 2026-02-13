@@ -49,6 +49,7 @@ The following environment modules were loaded on Saga (Sigma2 cluster) during an
 - HMMER/3.4-gompi-2023a
 - BLAST+/2.14.1-gompi-2023a
 - Python/3.10.8-GCCcore-12.2.0
+- InterProScan/5.62-94.0-foss-2022a
 
 #### Singularity Container for Trinity 
 The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
@@ -149,6 +150,17 @@ if [[ ! -s "$OUT_DIR/Trinotate.sqlite" ]] || \
   chmod 664 "$OUT_DIR/Trinotate.sqlite"
 fi
 ```
+
+#### EggNOG‑mapper environment
+eggNOG‑mapper is run inside an Apptainer container and requires the full eggNOG v5.0.2 database.
+
+Container:
+- `quay.io/biocontainers/eggnog-mapper:2.1.13--pyhdfd78af_2`
+  (pulled as a `.sif` file by `eggnog_prepare.sh`)
+
+Database:
+- eggNOG v5.0.2 (downloaded and unpacked by `eggnog_prepare.sh`; includes DIAMOND, MMseqs2, PFAM, and taxonomy databases)
+
 ---
 
 ## Scripts
@@ -682,7 +694,7 @@ cat results/annotation/trinotate/blastx/chunks/*/*.blastx \
 
 ⸺
 
-#### SignalP
+### SignalP
 SignalP 6.0 was used to predict signal peptides in the translated ORFs. Because SignalP is not included in the Trinotate container due to licensing restrictions, and no SignalP module is available on Saga (Sigma2) cluster, the tool was installed in a dedicated Python virtual environment (see Working Environment section above). The peptide FASTA was processed in chunks using SLURM array jobs, and results were merged into a single Trinotate‑compatible output file.
 
 [signalp_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_prepare.sh)
@@ -958,8 +970,194 @@ bash scripts/annotation/trinotate/go_finalize.sh \
     results/annotation/trinotate/go_extraction \
     results/annotation/trinotate/trinotate_final
 ```
+
 ⸺
 
+### Transcriptome Annotation (eggNOG‑mapper Pipeline)
+EggNOG‑mapper was used to assign orthology‑based functional annotations to predicted proteins.
+The workflow consists of three scripts: one for preparing the container and database, one for running the annotation, and one for extracting GO/KO/KEGG/COG terms from the .emapper.annotations file.
+All steps were executed on the Saga cluster using Apptainer and node‑local scratch for performance.
+
+[eggnog_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/eggnog/eggnog_prepare.sh)
+
+Downloads and prepares all resources required by eggNOG‑mapper.
+This script pulls the eggNOG‑mapper Apptainer image (if missing) and downloads the full eggNOG v5.0.2 database set, including DIAMOND, MMseqs2, PFAM, and taxonomy files.
+It unpacks all components and ensures the database directory is complete before annotation.
+
+#### Inputs
+- Target path for the eggNOG‑mapper image (e.g., resources/eggnog-mapper.sif)
+- Target directory for the eggNOG v5.0.2 database (e.g., resources/eggnog_db)
+#### Outputs
+- eggNOG‑mapper .sif container
+- Unpacked eggNOG v5.0.2 database files (eggnog.db, eggnog.taxa.db, eggnog_proteins.dmnd, mmseqs/, pfam/)
+#### Usage
+```bash
+bash eggnog_prepare.sh <sif_path> <db_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/eggnog/eggnog_prepare.sh \
+    resources/eggnog-mapper.sif \
+    resources/eggnog_db
+```
+
+[eggnog_run.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/eggnog/eggnog_run.sh)
+
+Runs eggNOG‑mapper on a peptide FASTA file using Apptainer.
+The script stages the input FASTA and the DIAMOND database into node‑local scratch, then executes eggNOG‑mapper in DIAMOND mode with --dbmem enabled to load the DIAMOND database into memory for faster searches, and PFAM realignment activated.
+Output filenames are generated using the user‑supplied prefix.
+All .emapper.* outputs are written back to the specified output directory
+
+#### Inputs
+- eggNOG‑mapper .sif image (e.g., resources/eggnog-mapper.sif)
+- eggNOG v5.0.2 database directory (e.g., resources/eggnog_db)
+- Peptide FASTA file (e.g., results/annotation/transdecoder/longest_orfs.pep)
+#### Outputs
+- <prefix>.emapper.annotations (e.g., Trinity.emapper.annotations)
+- <prefix>.emapper.hits (e.g., Trinity.emapper.hits)
+- <prefix>.emapper.pfam (e.g., Trinity.emapper.pfam)
+- <prefix>.emapper.seed_orthologs (e.g., Trinity.emapper.seed_orthologs)
+#### Usage
+```bash
+bash eggnog_run.sh <sif> <db_dir> <pep_fasta> <out_prefix> <out_dir> <threads>
+```
+#### Example
+```bash
+bash scripts/annotation/eggnog/eggnog_run.sh \
+    resources/eggnog-mapper.sif \
+    resources/eggnog_db \
+    results/annotation/transdecoder/longest_orfs.pep \
+    Trinity \
+    results/annotation/eggnog \
+    12
+```
+
+[eggnog_qc_extract.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/eggnog/eggnog_qc_extract.sh)
+
+Extracts functional categories from the .emapper.annotations file.
+The script detects the correct header line, identifies the GO/KO/KEGG/COG columns, and generates tidy per‑gene TSVs along with count tables.
+Duplicate gene–annotation pairs are removed to ensure clean downstream integration.
+
+#### Inputs
+- .emapper.annotations file (e.g., Trinity.emapper.annotations)
+#### Outputs
+- eggnog_GO_by_gene.tsv
+- eggnog_KO_by_gene.tsv
+- eggnog_KEGG_pathway_by_gene.tsv
+- eggnog_COG_by_gene.tsv
+- eggnog_COG_counts.tsv
+- eggnog_KO_counts.tsv
+- eggnog_KEGG_pathway_counts.tsv
+#### Usage
+```bash
+bash eggnog_qc_extract.sh <annotations> <out_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/eggnog/eggnog_qc_extract.sh \
+    results/annotation/eggnog/Trinity.emapper.annotations \
+    results/annotation/eggnog
+```
+
+⸺
+
+### Transcriptome Annotation (InterProScan)
+
+InterProScan was used to annotate predicted proteins with domain signatures, GO terms, and InterPro accessions.
+IPS was run using the InterProScan module available on the Saga cluster.
+Because the dataset was large, the peptide FASTA was processed in chunks using SLURM array jobs.
+Per‑chunk IPS outputs were then merged into a single file for downstream Trinotate integration.
+
+[ips_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/ips/ips_chunking.sh)
+
+Splits a peptide FASTA file into smaller chunks without breaking FASTA records.
+Before splitting, the script generates a cleaned version of the FASTA with all * characters removed, as these can cause IPS parsing errors.
+Chunks are created based on a maximum number of sequences per chunk (default: 32,000), ensuring balanced IPS runtimes across array tasks.
+
+#### Inputs
+- Peptide FASTA file (e.g., longest_orfs.pep)
+#### Outputs
+- Cleaned FASTA file for provenance (e.g., longest_orfs.cleaned.pep)
+- chunk_000/chunk_000.pep
+- chunk_001/chunk_001.pep
+- … one directory per chunk
+#### Usage
+````bash
+bash ips_chunking.sh <pep_file> <chunks_dir> [chunk_size]
+```
+#### Example
+```bash
+bash scripts/annotation/ips/ips_chunking.sh \
+    results/annotation/transdecoder/longest_orfs.pep \
+    results/annotation/ips/chunks \
+    32000
+```
+
+[ips.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/ips/ips.sh)
+
+Runs InterProScan on a single peptide FASTA chunk.
+The script determines an output base name from the FASTA filename, uses node‑local scratch for temporary files, and produces both TSV (for Trinotate) and GFF3 outputs.
+Output filenames are generated automatically from the chunk name.
+
+#### Inputs
+- Peptide FASTA file (e.g., chunk_000.pep)
+#### Outputs
+- chunk_000.tsv
+- chunk_000.gff3
+
+#### Usage
+```bash
+bash ips.sh <pep_fasta> <out_dir> <threads>
+```
+#### Example (SLURM array job)
+```bash
+# Format array index to match chunk naming
+TASK_ID=$(printf "%03d" "$SLURM_ARRAY_TASK_ID")
+
+# Define input FASTA and output directory for this chunk
+CHUNK="results/annotation/ips/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.pep"
+OUTDIR="results/annotation/ips/chunks/chunk_${TASK_ID}"
+
+# Run IPS
+bash scripts/annotation/ips/ips.sh \
+    "$CHUNK" \
+    "$OUTDIR" \
+    "$SLURM_CPUS_PER_TASK"
+```
+
+After all array tasks finished, per‑chunk IPS outputs were merged:
+```bash
+cat results/annotation/ips/chunks/chunk_*/chunk_*.tsv \
+    > results/annotation/ips/IPS_raw.tsv
+sort -u results/annotation/ips/IPS_raw.tsv \
+    > results/annotation/ips/IPS_merged.tsv
+rm results/annotation/ips/IPS_raw.tsv
+```
+
+[ips_qc_extract.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/ips/ips_qc_extract.sh)
+Extracts GO terms and InterPro accession counts from the merged IPS TSV file.
+The script reads the IPS TSV (headerless) and generates two summary tables: GO terms per gene and InterPro accession counts.
+#### Inputs
+- IPS TSV file (e.g., IPS_merged.tsv)
+Outputs
+- ips_GO_by_gene.tsv
+- ips_interpro_counts.tsv
+#### Usage
+```bash
+bash ips_qc_extract.sh <IPS_TSV> <out_dir>
+```
+#### Example
+```bash
+bash scripts/annotation/ips/ips_qc_extract.sh \
+    results/annotation/ips/IPS_merged.tsv \
+    results/annotation/ips
+```
+
+
+
+
+
+⸺
 
 #### trinities_filter_by_gene_cov.sh
 

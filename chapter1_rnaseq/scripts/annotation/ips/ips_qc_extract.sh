@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# InterProScan QC extractor (headerless TSV)
-# Input : IPS TSV (query col1; InterPro acc col12; GO terms col14 pipe-separated)
-# Output: GO map + InterPro accession counts
-
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 <IPS_TSV> <OUTDIR>" >&2
   exit 1
