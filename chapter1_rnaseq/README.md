@@ -1109,6 +1109,7 @@ Output filenames are generated automatically from the chunk name.
 ```bash
 bash ips.sh <pep_fasta> <out_dir> <threads>
 ```
+
 #### Example (SLURM array job)
 ```bash
 # Format array index to match chunk naming
