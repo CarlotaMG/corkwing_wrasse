@@ -1,10 +1,12 @@
 # # Ignore raw data and results folders in chapter directories
 chapter1_rnaseq/data/
+chapter1_rnaseq/resources/
 chapter1_rnaseq/results/
 chapter1_rnaseq/jobs/
 chapter2_wgs/data/
 chapter2_wgs/results/
 chapter2_wgs/jobs/
+chapter2_wg/resources/
 
 # Ignore everything in resources/
 chapter1_rnaseq/resources/*
@@ -23,6 +25,7 @@ chapter1_rnaseq/resources/*
 
 # User-specific files
 .Ruserdata
+chapter1_rnaseq/.here
 
 # Example code in package build process
 *-Ex.R
@@ -94,6 +97,7 @@ __pycache__/
 *.zip
 *.tar
 *.tar.gz
+*.tsv
 *.sif
 
 # Execptions
