@@ -1,0 +1,608 @@
+---
+title: "Tier 3 Differential Expression Analysis (Hybrid Misregulation)"
+author: "Carlota Myhre de Gouveia"
+date: "2026-02-15"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+# Global chunk options
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+# Setup and Package Loading
+```{r packages}
+# Load required packages
+suppressPackageStartupMessages({
+  library(DESeq2)      # Differential expression analysis
+  library(ashr)        # Shrinkage for log2 fold changes
+  library(tidyverse)   # Data manipulation
+  library(here)        # Project-root relative paths
+  library(dplyr)
+  library(rlang)
+})
+```
+
+
+
+# Data Import and Inspection
+```{r load_and_inspect_data}
+# ================================
+# Data Import and Cleaning
+# ================================
+
+# -----------------------------
+# 1. Load raw files exactly as-is
+# -----------------------------
+counts_raw <- read.delim(
+  counts_file,
+  header = TRUE,
+  sep = "\t",
+  check.names = FALSE
+)
+
+tpm_raw <- read.delim(
+  tpm_file,
+  header = TRUE,
+  sep = "\t",
+  check.names = FALSE
+)
+
+# -----------------------------
+# 2. Fix the missing first column name
+# -----------------------------
+colnames(counts_raw)[1] <- "isoform"
+colnames(tpm_raw)[1]    <- "isoform"
+
+# -----------------------------
+# 3. Remove the metadata column
+# -----------------------------
+counts_raw <- counts_raw[, colnames(counts_raw) != "abundance_estimation"]
+tpm_raw    <- tpm_raw[, colnames(tpm_raw)    != "abundance_estimation"]
+
+# -----------------------------
+# 4. Set isoform IDs as rownames
+# -----------------------------
+rownames(counts_raw) <- counts_raw$isoform
+rownames(tpm_raw)    <- tpm_raw$isoform
+
+counts_raw <- counts_raw[, -1]   # remove isoform column
+tpm_raw    <- tpm_raw[, -1]
+
+# -----------------------------
+# 5. Convert to numeric safely
+# -----------------------------
+abundance_matrix <- as.data.frame(lapply(counts_raw, as.numeric))
+tpm_matrix       <- as.data.frame(lapply(tpm_raw,    as.numeric))
+
+rownames(abundance_matrix) <- rownames(counts_raw)
+rownames(tpm_matrix)       <- rownames(tpm_raw)
+
+# -----------------------------
+# 6. Remove rows with any NA
+# -----------------------------
+keep_complete <- complete.cases(abundance_matrix) & complete.cases(tpm_matrix)
+
+abundance_matrix <- abundance_matrix[keep_complete, ]
+tpm_matrix       <- tpm_matrix[keep_complete, ]
+
+cat("Rows removed due to NA:", sum(!keep_complete), "\n")
+cat("Final number of isoforms:", nrow(abundance_matrix), "\n")
+
+# ================================
+# Inspect Cleaned Count Matrix
+# ================================
+
+cat("Dimensions:", dim(abundance_matrix), "\n")
+
+# Check column types
+cat("\nColumn classes:\n")
+print(sapply(abundance_matrix, class))
+
+# Summary of first few columns
+cat("\nSummary of first 5 columns:\n")
+print(summary(abundance_matrix[, 1:5]))
+
+# Check for any negative values (should be none)
+cat("\nAny negative values?", any(abundance_matrix < 0), "\n")
+
+# Check for non-integers (DESeq2 will round anyway, but good to know)
+cat("\nAny non-integers?", any(abundance_matrix %% 1 != 0), "\n")
+
+# Look at first few rows
+cat("\nHead of abundance_matrix:\n")
+print(head(abundance_matrix[, 1:6]))
+
+# Check row sums distribution
+cat("\nRow sums summary:\n")
+print(summary(rowSums(abundance_matrix)))
+
+# Check if any sample has suspiciously low total counts
+cat("\nLibrary sizes (column sums):\n")
+print(colSums(abundance_matrix))
+
+```
+```{r}
+sample_info
+```
+
+
+## Data Cleaning and Filtering
+```{r filtering}
+
+# Align column names with sample metadata
+colnames(abundance_matrix) <- sample_info$sample
+colnames(tpm_matrix)       <- sample_info$sample
+
+# Convert to matrices
+abund_num <- as.matrix(abundance_matrix)
+tpm_num   <- as.matrix(tpm_matrix)
+
+# Filtering rules
+keep_counts <- rowSums(abund_num) >= 10
+keep_tpm    <- rowSums(tpm_num >= 1) >= 2
+
+# Combined filter
+keep <- keep_counts & keep_tpm
+
+# Apply filter
+abundance_matrix <- abundance_matrix[keep, ]
+tpm_matrix       <- tpm_matrix[keep, ]
+
+# Report
+initial_n <- nrow(abund_num)
+final_n   <- nrow(abundance_matrix)
+
+cat("Initial isoforms:", initial_n, "\n")
+cat("After filtering:", final_n, "\n")
+cat("Retained:", round(final_n / initial_n * 100, 2), "%\n")
+```
+```{r}
+# Inspect the filtered count matrix
+cat("Class of abundance_matrix:\n")
+print(class(abundance_matrix))
+
+cat("\nStorage mode:\n")
+print(storage.mode(abundance_matrix))
+
+cat("\nAny NA values?\n")
+print(any(is.na(abundance_matrix)))
+
+cat("\nAny non-integers?\n")
+print(any(abundance_matrix %% 1 != 0))
+
+cat("\nSummary of values:\n")
+print(summary(as.vector(as.matrix(abundance_matrix))))
+```
+
+# DESeq2 Model Setup
+```{r deseq_setup}
+# Convert to integer matrix (RSEM expected counts → DESeq2)
+abund_num <- round(as.matrix(abundance_matrix))
+storage.mode(abund_num) <- "integer"
+
+# Build DESeq2 dataset
+dds <- DESeqDataSetFromMatrix(
+  countData = abund_num,
+  colData   = sample_info,
+  design    = ~ condition
+)
+
+# Run DESeq2
+dds <- DESeq(dds)
+
+cat("DESeq2 model fitted for Tier 3 analysis\n")
+```
+# Differential Expression for Tier 3 Contrasts
+```{r DE_contrasts}
+
+output_dir <- here("results", "DE", "tier3_DE")
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+temps <- c(12, 15, 18)
+
+for (t in temps) {
+  
+  cond_H <- paste0("H", t)
+  cond_S <- paste0("S", t)
+  cond_W <- paste0("W", t)
+  
+  # -------------------------
+  # H vs S
+  # -------------------------
+  message("\nRunning contrast: ", cond_H, " vs ", cond_S)
+  
+  res_HS <- results(dds, contrast = c("condition", cond_H, cond_S))
+  res_HS_shrunk <- lfcShrink(dds, contrast = c("condition", cond_H, cond_S),
+                             res = res_HS, type = "ashr")
+  
+  iso <- rownames(res_HS_shrunk)
+  df_HS <- as.data.frame(res_HS_shrunk)
+  df_HS$isoform <- iso
+  df_HS <- df_HS[, c("isoform", setdiff(colnames(df_HS), "isoform"))]
+  
+  write.table(df_HS,
+              file.path(output_dir, paste0(cond_H, "_vs_", cond_S, ".tsv")),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  
+  # -------------------------
+  # H vs W
+  # -------------------------
+  message("Running contrast: ", cond_H, " vs ", cond_W)
+  
+  res_HW <- results(dds, contrast = c("condition", cond_H, cond_W))
+  res_HW_shrunk <- lfcShrink(dds, contrast = c("condition", cond_H, cond_W),
+                             res = res_HW, type = "ashr")
+  
+  iso <- rownames(res_HW_shrunk)
+  df_HW <- as.data.frame(res_HW_shrunk)
+  df_HW$isoform <- iso
+  df_HW <- df_HW[, c("isoform", setdiff(colnames(df_HW), "isoform"))]
+  
+  write.table(df_HW,
+              file.path(output_dir, paste0(cond_H, "_vs_", cond_W, ".tsv")),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+  
+  # -------------------------
+  # S vs W (parental contrast)
+  # -------------------------
+  message("Running parental contrast: ", cond_S, " vs ", cond_W)
+  
+  res_SW <- results(dds, contrast = c("condition", cond_S, cond_W))
+  res_SW_shrunk <- lfcShrink(dds, contrast = c("condition", cond_S, cond_W),
+                             res = res_SW, type = "ashr")
+  
+  iso <- rownames(res_SW_shrunk)
+  df_SW <- as.data.frame(res_SW_shrunk)
+  df_SW$isoform <- iso
+  df_SW <- df_SW[, c("isoform", setdiff(colnames(df_SW), "isoform"))]
+  
+  write.table(df_SW,
+              file.path(output_dir, paste0(cond_S, "_vs_", cond_W, ".tsv")),
+              sep = "\t", quote = FALSE, row.names = FALSE)
+}
+```
+
+```{r}
+res_HS <- read.delim(here("results","DE","tier3_DE","H12_vs_S12.tsv"))
+res_HW <- read.delim(here("results","DE","tier3_DE","H12_vs_W12.tsv"))
+res_SW <- read.delim(here("results","DE","tier3_DE","S12_vs_W12.tsv"))
+
+DE_test <- merge(res_HS, res_HW, by="isoform")
+DE_test <- merge(DE_test, res_SW[,c("isoform","padj")], by="isoform")
+
+dim(DE_test)
+head(DE_test)
+```
+
+
+```{r}
+file_to_check <- here("results", "DE", "tier3_DE", "H12_vs_S12.tsv")
+head(read.delim(file_to_check))
+colnames(read.delim(file_to_check))
+```
+
+
+```{r}
+# Path to the file
+file_to_check <- here("results", "DE", "tier3_DE", "H15_vs_S15.tsv")
+
+# Load it
+res_test <- read.delim(file_to_check)
+
+# Basic structure
+cat("Dimensions:\n")
+print(dim(res_test))
+
+cat("\nColumn names:\n")
+print(colnames(res_test))
+
+# Peek at the first rows
+cat("\nHead:\n")
+print(head(res_test))
+
+# Summary of key columns
+cat("\nSummary of log2FoldChange:\n")
+print(summary(res_test$log2FoldChange))
+
+cat("\nSummary of padj:\n")
+print(summary(res_test$padj))
+
+# Count DE genes
+cat("\nNumber of DE isoforms (padj < 0.05):\n")
+print(sum(res_test$padj < 0.05, na.rm = TRUE))
+
+# Check for NA in critical columns
+cat("\nAny NA in log2FoldChange?\n")
+print(any(is.na(res_test$log2FoldChange)))
+
+cat("\nAny NA in padj?\n")
+print(any(is.na(res_test$padj)))
+```
+
+# Build sample-to-condition mapping
+```{r sample_mapping}
+
+# sample_info must contain columns: condition, sample
+# This creates a list where each element is a vector of TPM column names
+sample_map <- split(sample_info$sample, sample_info$condition)
+
+# Example:
+# sample_map$H12 gives all TPM columns for Hybrid at 12°C
+# sample_map$S15 gives all TPM columns for South at 15°C
+# sample_map$W18 gives all TPM columns for West at 18°C
+
+sample_map
+```
+
+Expression patterns
+│
+├── Normal inheritance
+│     (H is NOT DE from at least one pure line)
+│
+│     ├── Conserved
+│     ├── Additive
+│     └── Parent-like
+│           ├── Parent-like S
+│           └── Parent-like W
+│
+└── Misexpression
+      (H is DE from BOTH pure lines)
+      |
+      ├── Within‑range misregulated
+      │     (H between S and W)
+      │
+      └── Outside‑range misregulated (Transgressive)
+            ├── Transgressive up
+            └── Transgressive down
+            
+
+# Expression Classification for Tier 3 (per temperature)
+```{r express_classification}
+
+classify_expression <- function(temp) {
+  
+  # Load DE results
+  res_HS <- read.delim(here("results", "DE", "tier3_DE",
+                            paste0("H", temp, "_vs_S", temp, ".tsv")))
+  res_HW <- read.delim(here("results", "DE", "tier3_DE",
+                            paste0("H", temp, "_vs_W", temp, ".tsv")))
+  res_SW <- read.delim(here("results", "DE", "tier3_DE",
+                            paste0("S", temp, "_vs_W", temp, ".tsv")))
+  
+  # Merge DE tables
+  DE <- merge(res_HS, res_HW, by = "isoform", suffixes = c("_HS", "_HW"))
+  
+  res_SW_small <- res_SW[, c("isoform", "padj")]
+  colnames(res_SW_small)[2] <- "padj_SW"
+  
+  DE <- merge(DE, res_SW_small, by = "isoform")
+  
+  # Extract padj
+  padj_HS <- DE$padj_HS
+  padj_HW <- DE$padj_HW
+  padj_SW <- DE$padj_SW
+  
+  # Get TPM columns for this temperature
+  H_cols <- sample_map[[paste0("H", temp)]]
+  S_cols <- sample_map[[paste0("S", temp)]]
+  W_cols <- sample_map[[paste0("W", temp)]]
+  
+  # Compute mean TPM per group
+  meanH <- rowMeans(tpm_matrix[DE$isoform, H_cols, drop = FALSE])
+  meanS <- rowMeans(tpm_matrix[DE$isoform, S_cols, drop = FALSE])
+  meanW <- rowMeans(tpm_matrix[DE$isoform, W_cols, drop = FALSE])
+  
+  # DE flags
+  DE_HS <- padj_HS < 0.05
+  DE_HW <- padj_HW < 0.05
+  DE_SW <- padj_SW < 0.05
+  
+  notDE_HS <- !DE_HS
+  notDE_HW <- !DE_HW
+  
+  # Hybrid position
+  H_between <- (meanH > pmin(meanS, meanW)) & (meanH < pmax(meanS, meanW))
+  H_above   <- meanH > pmax(meanS, meanW)
+  H_below   <- meanH < pmin(meanS, meanW)
+  
+  # Initialize category
+  category <- rep("other", nrow(DE))
+  
+  # Normal inheritance
+  conserved <- notDE_HS & notDE_HW & !DE_SW
+  additive  <- notDE_HS & notDE_HW & H_between
+  
+  parent_like_S <- DE_SW & notDE_HS & DE_HW
+  parent_like_W <- DE_SW & notDE_HW & DE_HS
+  
+  category[conserved]       <- "conserved"
+  category[additive]        <- "additive"
+  category[parent_like_S]   <- "parent_like_S"
+  category[parent_like_W]   <- "parent_like_W"
+  
+  # Misexpression
+  misregulated <- DE_HS & DE_HW
+  
+  within_mis <- misregulated & H_between
+  trans_up   <- misregulated & H_above
+  trans_down <- misregulated & H_below
+  
+  category[within_mis] <- "within_range_misregulated"
+  category[trans_up]   <- "transgressive_up"
+  category[trans_down] <- "transgressive_down"
+  
+  category[misregulated & !(within_mis | trans_up | trans_down)] <- "misregulated_other"
+  
+  DE$category    <- category
+  DE$temperature <- temp
+  
+  # Add TPM means so we can analyze "other"
+  DE$meanH <- meanH
+  DE$meanS <- meanS
+  DE$meanW <- meanW
+
+
+  
+  return(DE)
+}
+```
+
+# Run classification for all temperatures
+```{r temp_class}
+DE_12 <- classify_expression(12)
+DE_15 <- classify_expression(15)
+DE_18 <- classify_expression(18)
+
+DE_all <- bind_rows(DE_12, DE_15, DE_18)
+table(DE_all$temperature, DE_all$category)
+
+```
+# Decompose "other" category into meaningful subgroups
+```{r other_decomposition}
+
+decompose_other <- function(DE) {
+  
+  # Keep only the "other" rows
+  DEo <- DE[DE$category == "other", ]
+  
+  # Extract padj
+  padj_HS <- DEo$padj_HS
+  padj_HW <- DEo$padj_HW
+  padj_SW <- DEo$padj_SW
+  
+  # DE flags
+  DE_HS <- padj_HS < 0.05
+  DE_HW <- padj_HW < 0.05
+  DE_SW <- padj_SW < 0.05
+  
+  # Hybrid position
+  meanH <- DEo$meanH
+  meanS <- DEo$meanS
+  meanW <- DEo$meanW
+  
+  H_between <- (meanH > pmin(meanS, meanW)) & (meanH < pmax(meanS, meanW))
+  
+  # Subcategories inside "other"
+  only_HS <- DE_HS & !DE_HW
+  only_HW <- DE_HW & !DE_HS
+  only_SW <- DE_SW & !DE_HS & !DE_HW
+  
+  low_expr <- is.na(meanH) | is.na(meanS) | is.na(meanW)
+  
+  ambiguous_between <- H_between & !(DE_HS | DE_HW | DE_SW)
+  
+  discordant <- (DE_HS | DE_HW) & H_between
+  
+  # Return counts
+  data.frame(
+    only_HS = sum(only_HS, na.rm = TRUE),
+    only_HW = sum(only_HW, na.rm = TRUE),
+    only_SW = sum(only_SW, na.rm = TRUE),
+    low_expr = sum(low_expr, na.rm = TRUE),
+    ambiguous_between = sum(ambiguous_between, na.rm = TRUE),
+    discordant = sum(discordant, na.rm = TRUE)
+  )
+}
+
+# Apply to each temperature
+other_12 <- decompose_other(DE_12)
+other_15 <- decompose_other(DE_15)
+other_18 <- decompose_other(DE_18)
+
+other_12
+other_15
+other_18
+```
+Most isoforms in the ‘other’ category showed asymmetric divergence, where the hybrid differed from one parent but not the other, while the parents themselves did not differ. Because parent‑like inheritance requires parental divergence, these isoforms do not fit into the parent‑like category. They also do not meet criteria for additive or misexpressed patterns, and therefore remain unclassified.
+
+# Summary of expression categories across temperatures
+```{r summarize_categories}
+summary_table <- DE_all %>%
+  group_by(temperature, category) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = category, values_from = n, values_fill = 0)
+
+summary_table
+
+```
+
+# Visualization: Stacked barplot of categories per temperature
+```{r plot_categories}
+
+library(ggplot2)
+
+ggplot(DE_all, aes(x = factor(temperature), fill = category)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Temperature (°C)",
+    y = "Proportion of isoforms",
+    fill = "Category",
+    title = "Distribution of expression inheritance categories across temperatures"
+  ) +
+  theme_minimal()
+```
+
+# Visualization: Focus on rare categories
+```{r plot_rare_categories}
+
+rare_cats <- c("parent_like_S", "parent_like_W",
+               "transgressive_up", "transgressive_down",
+               "within_range_misregulated")
+
+DE_rare <- DE_all %>% 
+  filter(category %in% rare_cats)
+
+ggplot(DE_rare, aes(x = factor(temperature), fill = category)) +
+  geom_bar(position = "stack") +
+  labs(
+    x = "Temperature (°C)",
+    y = "Number of isoforms",
+    fill = "Category",
+    title = "Rare inheritance categories across temperatures"
+  ) +
+  theme_minimal()
+```
+
+Most misregulated isoforms in hybrids show transgressive expression, meaning hybrid expression lies outside the parental range. Transgressive misexpression is the most extreme form of regulatory incompatibility and is often associated with reduced hybrid fitness.
+
+# Export ALL misexpressed isoforms per temperature (combined)
+```{r export_misexpressed_combined}
+
+# Misexpression categories
+mis_cats <- c("transgressive_up",
+              "transgressive_down",
+              "within_range_misregulated")
+
+# Output directory
+output_dir <- "results/DE/tier3_DE/misexpressed"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Loop through temperatures
+for (temp in c(12, 15, 18)) {
+  
+  DE_temp <- DE_all %>% filter(temperature == temp)
+  
+  mis_temp <- DE_temp %>% filter(category %in% mis_cats)
+  
+  file <- file.path(output_dir, paste0("misexpressed_", temp, "C.tsv"))
+  
+  write.table(
+    mis_temp,
+    file,
+    sep = "\t",
+    quote = FALSE,
+    row.names = FALSE
+  )
+}
+```
+
