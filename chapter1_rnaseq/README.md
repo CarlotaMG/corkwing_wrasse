@@ -790,7 +790,7 @@ bash signalp_merge.sh <chunks_dir> <merged_dir>
 ```bash
 bash scripts/annotation/trinotate/signalp_merge.sh \
     results/annotation/trinotate/signalp/chunks \
-    results/annotation/trinotate/signalp/merged
+    results/annotation/trinotate/signalp
 ```
 
 ⸺
