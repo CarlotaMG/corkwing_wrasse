@@ -781,7 +781,7 @@ This script expects each chunk directory to contain a signalp_out/ folder produc
 - Directory for merged output files (e.g., signalp/)
 #### Outputs
 - Merged SignalP prediction results (signalp_merged.prediction_results.txt)
-- Merged SignalP region annotations (signalp_merged.region_output.gff3)
+- Merged SignalP gff3 outputs (signalp_merged.output.gff3)
 #### Usage
 ```bash
 bash signalp_merge.sh <chunks_dir> <merged_dir>
