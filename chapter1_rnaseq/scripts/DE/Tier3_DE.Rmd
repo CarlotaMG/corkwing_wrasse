@@ -1,7 +1,7 @@
 ---
-title: "Tier 3 Differential Expression Analysis (Hybrid Misregulation)"
+title: "Tier 3 Differential Expression Analysis (Hybrid Inheritance)"
 author: "Carlota Myhre de Gouveia"
-date: "2026-02-15"
+date: "2026-04-24"
 output:
   html_document:
     toc: true
@@ -9,131 +9,96 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# Global chunk options
-knitr::opts_chunk$set(
-  echo = TRUE,
-  message = FALSE,
-  warning = FALSE
-)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
 ```
 
 
-# Setup and Package Loading
+## Setup and Package Loading
 ```{r packages}
 # Load required packages
 suppressPackageStartupMessages({
-  library(DESeq2)      # Differential expression analysis
-  library(ashr)        # Shrinkage for log2 fold changes
-  library(tidyverse)   # Data manipulation
-  library(here)        # Project-root relative paths
+  library(readxl)
+	library(DESeq2)      
+  library(ashr)        
+  library(tidyverse)   
   library(dplyr)
   library(rlang)
+  library(ggVennDiagram)
+  library(readr)
+  library(DT)
+
 })
 ```
 
 
-
-# Data Import and Inspection
+## Data Import and Preprocessing
 ```{r load_and_inspect_data}
-# ================================
-# Data Import and Cleaning
-# ================================
 
-# -----------------------------
-# 1. Load raw files exactly as-is
-# -----------------------------
-counts_raw <- read.delim(
-  counts_file,
-  header = TRUE,
-  sep = "\t",
-  check.names = FALSE
-)
+## Define isoform-level abundance files
+counts_file <- "results/assembly/trinity/abundance_estimation/compiled_abundance/abundance_matrix_isoforms.isoform.counts.matrix"
+tpm_file    <- "results/assembly/trinity/abundance_estimation/compiled_abundance/abundance_matrix_isoforms.isoform.TPM.not_cross_norm"
 
-tpm_raw <- read.delim(
-  tpm_file,
-  header = TRUE,
-  sep = "\t",
-  check.names = FALSE
-)
+## Load raw matrices
+counts_raw <- read.delim(counts_file, header = TRUE, sep = "\t", check.names = FALSE)
+tpm_raw    <- read.delim(tpm_file,    header = TRUE, sep = "\t", check.names = FALSE)
 
-# -----------------------------
-# 2. Fix the missing first column name
-# -----------------------------
+# Fix first column name
 colnames(counts_raw)[1] <- "isoform"
 colnames(tpm_raw)[1]    <- "isoform"
 
-# -----------------------------
-# 3. Remove the metadata column
-# -----------------------------
-counts_raw <- counts_raw[, colnames(counts_raw) != "abundance_estimation"]
-tpm_raw    <- tpm_raw[, colnames(tpm_raw)    != "abundance_estimation"]
+# Remove metadata column if present
+counts_raw <- counts_raw[, !colnames(counts_raw) %in% "abundance_estimation"]
+tpm_raw    <- tpm_raw[, !colnames(tpm_raw) %in% "abundance_estimation"]
 
-# -----------------------------
-# 4. Set isoform IDs as rownames
-# -----------------------------
+# Set isoform IDs as rownames
 rownames(counts_raw) <- counts_raw$isoform
 rownames(tpm_raw)    <- tpm_raw$isoform
 
-counts_raw <- counts_raw[, -1]   # remove isoform column
+# Drop the isoform column
+counts_raw <- counts_raw[, -1]
 tpm_raw    <- tpm_raw[, -1]
 
-# -----------------------------
-# 5. Convert to numeric safely
-# -----------------------------
+# Convert to numeric safely
 abundance_matrix <- as.data.frame(lapply(counts_raw, as.numeric))
 tpm_matrix       <- as.data.frame(lapply(tpm_raw,    as.numeric))
 
 rownames(abundance_matrix) <- rownames(counts_raw)
 rownames(tpm_matrix)       <- rownames(tpm_raw)
 
-# -----------------------------
-# 6. Remove rows with any NA
-# -----------------------------
+# Remove rows with any NA
 keep_complete <- complete.cases(abundance_matrix) & complete.cases(tpm_matrix)
-
 abundance_matrix <- abundance_matrix[keep_complete, ]
 tpm_matrix       <- tpm_matrix[keep_complete, ]
 
-cat("Rows removed due to NA:", sum(!keep_complete), "\n")
-cat("Final number of isoforms:", nrow(abundance_matrix), "\n")
+# Fix sample names to match Excel metadata
+colnames(abundance_matrix) <- sub(".*Melops", "", colnames(abundance_matrix))
+colnames(tpm_matrix)       <- sub(".*Melops", "", colnames(tpm_matrix))
 
-# ================================
-# Inspect Cleaned Count Matrix
-# ================================
 
-cat("Dimensions:", dim(abundance_matrix), "\n")
+# Load sample metadata from Excel
+sample_info <- readxl::read_excel("data/sample_conditions_rnaseq.xlsx") %>%
+  mutate(
+    sample = sub("L", "", RNA_Later_ID),   # create 'sample' column to match abundance matrix
+    origin = factor(Origin, levels = c("W","H","S")),
+    temperature = factor(`Temperature (celsius)`, levels = c(12,15,18)),
+    condition = factor(RNAseqgroup,
+                       levels = c("W12","W15","W18",
+                                  "H12","H15","H18",
+                                  "S12","S15","S18")),
+    length = scale(`Total length (mm)`)
+  ) %>%
+  select(sample, origin, temperature, condition, length) %>%
+  arrange(match(sample, colnames(abundance_matrix)))
 
-# Check column types
-cat("\nColumn classes:\n")
-print(sapply(abundance_matrix, class))
-
-# Summary of first few columns
-cat("\nSummary of first 5 columns:\n")
-print(summary(abundance_matrix[, 1:5]))
-
-# Check for any negative values (should be none)
-cat("\nAny negative values?", any(abundance_matrix < 0), "\n")
-
-# Check for non-integers (DESeq2 will round anyway, but good to know)
-cat("\nAny non-integers?", any(abundance_matrix %% 1 != 0), "\n")
-
-# Look at first few rows
-cat("\nHead of abundance_matrix:\n")
-print(head(abundance_matrix[, 1:6]))
-
-# Check row sums distribution
-cat("\nRow sums summary:\n")
-print(summary(rowSums(abundance_matrix)))
-
-# Check if any sample has suspiciously low total counts
-cat("\nLibrary sizes (column sums):\n")
-print(colSums(abundance_matrix))
-
+# Preview matrices and metadata
+knitr::kable(abundance_matrix[1:10, 1:10],
+             caption = "Isoform count matrix (first 10 isoforms × 10 samples)")
+knitr::kable(tpm_matrix[1:10, 1:10],
+             caption = "Isoform TPM matrix (first 10 isoforms × 10 samples)")
+knitr::kable(sample_info, caption = "Sample metadata")
 ```
-```{r}
-sample_info
-```
-
 
 ## Data Cleaning and Filtering
 ```{r filtering}
@@ -165,35 +130,28 @@ cat("Initial isoforms:", initial_n, "\n")
 cat("After filtering:", final_n, "\n")
 cat("Retained:", round(final_n / initial_n * 100, 2), "%\n")
 ```
-```{r}
-# Inspect the filtered count matrix
-cat("Class of abundance_matrix:\n")
-print(class(abundance_matrix))
-
-cat("\nStorage mode:\n")
-print(storage.mode(abundance_matrix))
-
-cat("\nAny NA values?\n")
-print(any(is.na(abundance_matrix)))
-
-cat("\nAny non-integers?\n")
-print(any(abundance_matrix %% 1 != 0))
-
-cat("\nSummary of values:\n")
-print(summary(as.vector(as.matrix(abundance_matrix))))
-```
 
 # DESeq2 Model Setup
 ```{r deseq_setup}
+# Ensure condition is a factor with correct ordering
+sample_info$condition <- factor(
+  sample_info$condition,
+  levels = c(
+    "H12","S12","W12",
+    "H15","S15","W15",
+    "H18","S18","W18"
+  )
+)
+
 # Convert to integer matrix (RSEM expected counts → DESeq2)
 abund_num <- round(as.matrix(abundance_matrix))
 storage.mode(abund_num) <- "integer"
 
-# Build DESeq2 dataset
+# Build DESeq2 dataset with length covariate
 dds <- DESeqDataSetFromMatrix(
   countData = abund_num,
   colData   = sample_info,
-  design    = ~ condition
+  design    = ~ length + condition
 )
 
 # Run DESeq2
@@ -204,8 +162,8 @@ cat("DESeq2 model fitted for Tier 3 analysis\n")
 # Differential Expression for Tier 3 Contrasts
 ```{r DE_contrasts}
 
-output_dir <- here("results", "DE", "tier3_DE")
-if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+# Define output directory 
+output_dir <- "results/DE/tier3_DE"
 
 temps <- c(12, 15, 18)
 
@@ -271,62 +229,6 @@ for (t in temps) {
 }
 ```
 
-```{r}
-res_HS <- read.delim(here("results","DE","tier3_DE","H12_vs_S12.tsv"))
-res_HW <- read.delim(here("results","DE","tier3_DE","H12_vs_W12.tsv"))
-res_SW <- read.delim(here("results","DE","tier3_DE","S12_vs_W12.tsv"))
-
-DE_test <- merge(res_HS, res_HW, by="isoform")
-DE_test <- merge(DE_test, res_SW[,c("isoform","padj")], by="isoform")
-
-dim(DE_test)
-head(DE_test)
-```
-
-
-```{r}
-file_to_check <- here("results", "DE", "tier3_DE", "H12_vs_S12.tsv")
-head(read.delim(file_to_check))
-colnames(read.delim(file_to_check))
-```
-
-
-```{r}
-# Path to the file
-file_to_check <- here("results", "DE", "tier3_DE", "H15_vs_S15.tsv")
-
-# Load it
-res_test <- read.delim(file_to_check)
-
-# Basic structure
-cat("Dimensions:\n")
-print(dim(res_test))
-
-cat("\nColumn names:\n")
-print(colnames(res_test))
-
-# Peek at the first rows
-cat("\nHead:\n")
-print(head(res_test))
-
-# Summary of key columns
-cat("\nSummary of log2FoldChange:\n")
-print(summary(res_test$log2FoldChange))
-
-cat("\nSummary of padj:\n")
-print(summary(res_test$padj))
-
-# Count DE genes
-cat("\nNumber of DE isoforms (padj < 0.05):\n")
-print(sum(res_test$padj < 0.05, na.rm = TRUE))
-
-# Check for NA in critical columns
-cat("\nAny NA in log2FoldChange?\n")
-print(any(is.na(res_test$log2FoldChange)))
-
-cat("\nAny NA in padj?\n")
-print(any(is.na(res_test$padj)))
-```
 
 # Build sample-to-condition mapping
 ```{r sample_mapping}
@@ -335,14 +237,10 @@ print(any(is.na(res_test$padj)))
 # This creates a list where each element is a vector of TPM column names
 sample_map <- split(sample_info$sample, sample_info$condition)
 
-# Example:
-# sample_map$H12 gives all TPM columns for Hybrid at 12°C
-# sample_map$S15 gives all TPM columns for South at 15°C
-# sample_map$W18 gives all TPM columns for West at 18°C
-
-sample_map
 ```
 
+## Classification scheme for hybrid expression patterns
+```text
 Expression patterns
 │
 ├── Normal inheritance
@@ -363,20 +261,20 @@ Expression patterns
       └── Outside‑range misregulated (Transgressive)
             ├── Transgressive up
             └── Transgressive down
-            
+```
 
 # Expression Classification for Tier 3 (per temperature)
 ```{r express_classification}
 
 classify_expression <- function(temp) {
   
-  # Load DE results
-  res_HS <- read.delim(here("results", "DE", "tier3_DE",
-                            paste0("H", temp, "_vs_S", temp, ".tsv")))
-  res_HW <- read.delim(here("results", "DE", "tier3_DE",
-                            paste0("H", temp, "_vs_W", temp, ".tsv")))
-  res_SW <- read.delim(here("results", "DE", "tier3_DE",
-                            paste0("S", temp, "_vs_W", temp, ".tsv")))
+  # Load DE results for this temperature
+  res_HS <- read.delim(file.path("results", "DE", "tier3_DE",
+                                 paste0("H", temp, "_vs_S", temp, ".tsv")))
+  res_HW <- read.delim(file.path("results", "DE", "tier3_DE",
+                                 paste0("H", temp, "_vs_W", temp, ".tsv")))
+  res_SW <- read.delim(file.path("results", "DE", "tier3_DE",
+                                 paste0("S", temp, "_vs_W", temp, ".tsv")))
   
   # Merge DE tables
   DE <- merge(res_HS, res_HW, by = "isoform", suffixes = c("_HS", "_HW"))
@@ -449,8 +347,6 @@ classify_expression <- function(temp) {
   DE$meanH <- meanH
   DE$meanS <- meanS
   DE$meanW <- meanW
-
-
   
   return(DE)
 }
@@ -468,6 +364,7 @@ table(DE_all$temperature, DE_all$category)
 ```
 # Decompose "other" category into meaningful subgroups
 ```{r other_decomposition}
+
 
 decompose_other <- function(DE) {
   
@@ -495,22 +392,20 @@ decompose_other <- function(DE) {
   only_HS <- DE_HS & !DE_HW
   only_HW <- DE_HW & !DE_HS
   only_SW <- DE_SW & !DE_HS & !DE_HW
-  
-  low_expr <- is.na(meanH) | is.na(meanS) | is.na(meanW)
-  
-  ambiguous_between <- H_between & !(DE_HS | DE_HW | DE_SW)
-  
   discordant <- (DE_HS | DE_HW) & H_between
   
-  # Return counts
-  data.frame(
+  # Counts
+  counts <- c(
     only_HS = sum(only_HS, na.rm = TRUE),
     only_HW = sum(only_HW, na.rm = TRUE),
     only_SW = sum(only_SW, na.rm = TRUE),
-    low_expr = sum(low_expr, na.rm = TRUE),
-    ambiguous_between = sum(ambiguous_between, na.rm = TRUE),
     discordant = sum(discordant, na.rm = TRUE)
   )
+  
+  # Residual = total "other" minus sum of subcategories
+  residual <- nrow(DEo) - sum(counts)
+  
+  data.frame(t(c(counts, residual = residual)))
 }
 
 # Apply to each temperature
@@ -518,11 +413,12 @@ other_12 <- decompose_other(DE_12)
 other_15 <- decompose_other(DE_15)
 other_18 <- decompose_other(DE_18)
 
-other_12
-other_15
-other_18
+knitr::kable(other_12, caption = "Decomposition of 'other' isoforms at 12°C")
+knitr::kable(other_15, caption = "Decomposition of 'other' isoforms at 15°C")
+knitr::kable(other_18, caption = "Decomposition of 'other' isoforms at 18°C")
 ```
-Most isoforms in the ‘other’ category showed asymmetric divergence, where the hybrid differed from one parent but not the other, while the parents themselves did not differ. Because parent‑like inheritance requires parental divergence, these isoforms do not fit into the parent‑like category. They also do not meet criteria for additive or misexpressed patterns, and therefore remain unclassified.
+
+We decomposed the heterogeneous ‘other’ category into interpretable subgroups. Isoforms classified as only_HS or only_HW showed asymmetric divergence, differing from one parent but not the other, but were not considered parent‑like because parental divergence was absent. The only_SW group captured parental divergence without hybrid divergence. Discordant cases represented hybrids positioned between parents yet still significantly diverging from one or both. The majority of isoforms did not meet these definitions and are reported as a residual group, reflecting missing values or heterogeneous patterns that cannot be assigned to a specific inheritance category under our criteria.
 
 # Summary of expression categories across temperatures
 ```{r summarize_categories}
@@ -534,6 +430,7 @@ summary_table <- DE_all %>%
 summary_table
 
 ```
+
 
 # Visualization: Stacked barplot of categories per temperature
 ```{r plot_categories}
@@ -551,6 +448,11 @@ ggplot(DE_all, aes(x = factor(temperature), fill = category)) +
   ) +
   theme_minimal()
 ```
+
+
+The majority of isoforms fall into the conserved and additive categories, showing that hybrid expression is largely consistent with parental regulation or intermediate between parental levels without being differentially expressed from either parent. A substantial fraction also falls into the other category, which reflects asymmetric divergence where the hybrid differs from one parent but not the other, while the parents themselves do not differ. Because parent‑like inheritance requires parental divergence, these isoforms cannot be assigned to parent‑like categories and remain unclassified.
+
+At 12°C, balanced replication (n=5 per origin) meant that DESeq2 produced valid padj values for nearly all isoforms. As a result, our classification function could assign most isoforms cleanly, leading to a large increase in the “conserved” category (86,896) and a much smaller “other” category (3,290). At 15°C and 18°C, however, the lower replication of South origin fish (n=2) limited statistical power in the parental contrast, producing many NA padj values and inflating the “other” category (37,799 and 43,112 isoforms, respectively).
 
 # Visualization: Focus on rare categories
 ```{r plot_rare_categories}
@@ -578,31 +480,449 @@ Most misregulated isoforms in hybrids show transgressive expression, meaning hyb
 # Export ALL misexpressed isoforms per temperature (combined)
 ```{r export_misexpressed_combined}
 
-# Misexpression categories
-mis_cats <- c("transgressive_up",
-              "transgressive_down",
-              "within_range_misregulated")
+# Ensure output directory exists
+dir.create("results/DE/tier3_DE/misexpressed", recursive = TRUE, showWarnings = FALSE)
 
-# Output directory
-output_dir <- "results/DE/tier3_DE/misexpressed"
-dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+mis_cats <- c("transgressive_up", "transgressive_down", "within_range_misregulated")
 
-# Loop through temperatures
 for (temp in c(12, 15, 18)) {
-  
-  DE_temp <- DE_all %>% filter(temperature == temp)
-  
-  mis_temp <- DE_temp %>% filter(category %in% mis_cats)
-  
-  file <- file.path(output_dir, paste0("misexpressed_", temp, "C.tsv"))
-  
+
+  iso <- DE_all %>%
+    filter(temperature == temp, category %in% mis_cats) %>%
+    pull(isoform) %>%
+    unique()
+
   write.table(
-    mis_temp,
-    file,
-    sep = "\t",
+    iso,
+    paste0("results/DE/tier3_DE/misexpressed/misexpressed_", temp, "C.tsv"),
     quote = FALSE,
-    row.names = FALSE
+    row.names = FALSE,
+    col.names = FALSE
   )
 }
 ```
+
+
+# Export parent like isoforms per temperature
+```{r export_parent_like}
+# Ensure output directory exists
+dir.create("results/DE/tier3_DE/parent_like", recursive = TRUE, showWarnings = FALSE)
+
+for (cat in c("parent_like_S", "parent_like_W")) {
+  for (temp in c(12, 15, 18)) {
+
+    iso <- DE_all %>%
+      filter(temperature == temp, category == cat) %>%
+      pull(isoform) %>% 
+      unique()
+
+    write.table(
+      iso,
+      paste0("results/DE/tier3_DE/parent_like/", cat, "_", temp, "C.tsv"),
+      quote = FALSE, row.names = FALSE, col.names = FALSE
+    )
+  }
+}
+```
+
+# Summarize DE counts per contrast and temperature
+```{r contrast_summary}
+
+contrast_summary <- data.frame()
+
+for (temp in c(12, 15, 18)) {
+  
+  # Load contrasts using relative paths
+  HS <- read.delim(file.path("results","DE","tier3_DE", paste0("H",temp,"_vs_S",temp,".tsv")))
+  HW <- read.delim(file.path("results","DE","tier3_DE", paste0("H",temp,"_vs_W",temp,".tsv")))
+  SW <- read.delim(file.path("results","DE","tier3_DE", paste0("S",temp,"_vs_W",temp,".tsv")))
+  
+  # Count DE genes (padj < 0.05)
+  n_HS <- sum(HS$padj < 0.05, na.rm = TRUE)
+  n_HW <- sum(HW$padj < 0.05, na.rm = TRUE)
+  n_SW <- sum(SW$padj < 0.05, na.rm = TRUE)
+  
+  # Add row
+  contrast_summary <- rbind(
+    contrast_summary,
+    data.frame(
+      temperature = temp,
+      DE_HS = n_HS,
+      DE_HW = n_HW,
+      DE_SW = n_SW
+    )
+  )
+}
+
+knitr::kable(contrast_summary, caption = "Counts of DE isoforms per contrast and temperature")
+```
+
+## Misexpressed isoforms overlap
+```{r missexpress_overlap}
+# Read misexpressed isoforms per temperature
+mis_list <- list(
+  `12°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_12C.tsv", header = FALSE)$V1,
+  `15°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_15C.tsv", header = FALSE)$V1,
+  `18°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_18C.tsv", header = FALSE)$V1
+)
+
+# Plot
+ggVennDiagram(mis_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#0072B2") +
+  ggtitle("Overlap of Misexpressed Isoforms Across Temperatures")
+```
+## Parent‑like S overlap
+```{r S_like_overlap}
+pls_list <- list(
+  `12°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_12C.tsv", header = FALSE)$V1,
+  `15°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_15C.tsv", header = FALSE)$V1,
+  `18°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_18C.tsv", header = FALSE)$V1
+)
+
+ggVennDiagram(pls_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#009E73") +
+  ggtitle("Overlap of Parent-like S Isoforms Across Temperatures")
+```
+
+## Parent‑like W overlap
+```{r W_like_overlap}
+plw_list <- list(
+  `12°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_12C.tsv", header = FALSE)$V1,
+  `15°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_15C.tsv", header = FALSE)$V1,
+  `18°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_18C.tsv", header = FALSE)$V1
+)
+
+ggVennDiagram(plw_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#D55E00") +
+  ggtitle("Overlap of Parent-like W Isoforms Across Temperatures")
+```
+
+## Define Tier 3 DE file paths
+```{r define_files}
+## Define Tier 3 DE file paths
+tier3_files <- list(
+  misexpressed_12C   = "results/DE/tier3_DE/misexpressed/misexpressed_12C.tsv",
+  misexpressed_15C   = "results/DE/tier3_DE/misexpressed/misexpressed_15C.tsv",
+  misexpressed_18C   = "results/DE/tier3_DE/misexpressed/misexpressed_18C.tsv",
+  parent_like_S_12C  = "results/DE/tier3_DE/parent_like/parent_like_S_12C.tsv",
+  parent_like_S_15C  = "results/DE/tier3_DE/parent_like/parent_like_S_15C.tsv",
+  parent_like_S_18C  = "results/DE/tier3_DE/parent_like/parent_like_S_18C.tsv",
+  parent_like_W_12C  = "results/DE/tier3_DE/parent_like/parent_like_W_12C.tsv",
+  parent_like_W_15C  = "results/DE/tier3_DE/parent_like/parent_like_W_15C.tsv",
+  parent_like_W_18C  = "results/DE/tier3_DE/parent_like/parent_like_W_18C.tsv"
+)
+```
+
+## Load EggNOG transcript‑level annotation
+```{r load_eggnog_anns}
+eggnog <- read.delim(
+  "results/annotation/eggnog/Trinity.emapper.annotations",
+  comment.char = "#",
+  header = FALSE,
+  sep = "\t",
+  stringsAsFactors = FALSE,
+  quote = ""
+)
+
+colnames(eggnog) <- c(
+  "query_name", "seed_ortholog", "evalue", "score", "eggNOG_OGs",
+  "max_annot_lvl", "COG_category", "Description", "Preferred_name",
+  "GOs", "EC", "KEGG_ko", "KEGG_Pathway", "KEGG_Module",
+  "KEGG_Reaction", "KEGG_rclass", "BRITE", "KEGG_TC",
+  "CAZy", "BiGG_Reaction", "PFAMs"
+)
+
+DT::datatable(
+  head(eggnog, 10),
+  options = list(pageLength = 5, scrollX = TRUE),
+  caption = "Preview of EggNOG transcript-level annotations"
+)
+```
+## Build gene-level GO annotation table from EggNOG output
+```{r build_gene_go_mapping}
+## Build gene-level GO annotation table
+eggnog_go <- eggnog %>%
+  dplyr::filter(GOs != "" & !is.na(GOs)) %>%
+  dplyr::select(trinity_id = query_name, GOs) %>%
+  dplyr::mutate(
+    trinity_id = sub("\\.p[0-9]+$", "", trinity_id),  # remove protein suffix
+    gene_id    = sub("_i[0-9]+$", "", trinity_id)     # collapse isoforms → gene
+  )
+
+gene2go <- eggnog_go %>%
+  tidyr::separate_rows(GOs, sep = ",|;") %>%
+  dplyr::mutate(GOs = stringr::str_trim(GOs)) %>%
+  dplyr::filter(GOs != "") %>%
+  dplyr::distinct(gene_id, GOs)
+
+head(gene2go)
+
+## Universe of annotated genes
+universe_genes <- unique(gene2go$gene_id)
+
+```
+## Build annotation coverage table and extract gene lists for Venn diagrams
+```{r ann_cov}
+gene_lists <- list()
+
+annotation_summary <- lapply(names(tier3_files), function(lbl) {
+
+  # Load transcript IDs for this Tier 3 category
+  df <- read.delim(tier3_files[[lbl]], header = FALSE)
+  colnames(df) <- "transcript_id"
+  transcripts <- df$transcript_id
+
+  # Collapse isoforms to gene IDs (e.g., TRINITY_DN123_c0_g1_i2 → TRINITY_DN123_c0_g1)
+  genes <- unique(sub("_i[0-9]+$", "", transcripts))
+
+  # Store gene IDs for later gene-level Venn diagrams
+  gene_lists[[lbl]] <<- genes
+
+  # Count how many transcripts and genes have EggNOG GO annotation
+  annotated_transcripts <- sum(transcripts %in% eggnog_go$trinity_id)
+  annotated_genes <- sum(genes %in% universe_genes)
+
+  # Return summary row
+  data.frame(
+    category = lbl,
+    total_transcripts = length(transcripts),
+    annotated_transcripts = annotated_transcripts,
+    percent_transcripts_annot = round(annotated_transcripts / length(transcripts) * 100, 2),
+    total_genes = length(genes),
+    annotated_genes = annotated_genes,
+    percent_genes_annot = round(annotated_genes / length(genes) * 100, 2)
+  )
+})
+
+annotation_summary <- dplyr::bind_rows(annotation_summary)
+
+
+datatable(
+  annotation_summary,
+  extensions = "Buttons",
+  options = list(
+    dom = "Bfrtip",
+    buttons = c("copy", "csv", "excel"),
+    pageLength = 10,
+    scrollX = TRUE
+  ),
+  caption = "Annotation Coverage for Tier 3 Differential Expression Categories"
+)
+
+```
+
+## Gene-level Venn diagram for misexpressed genes
+```{r misexpresses_venn_genes}
+mis_genes <- list(
+  `12°C` = gene_lists$misexpressed_12C,
+  `15°C` = gene_lists$misexpressed_15C,
+  `18°C` = gene_lists$misexpressed_18C
+)
+
+ggVennDiagram(mis_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#0072B2") +
+  ggtitle("Overlap of Misexpressed Genes Across Temperatures")
+```
+
+
+The number of misexpressed genes remains relatively stable across temperatures, suggesting that hybrid misregulation is not strongly temperature‑dependent but represents a consistent background of regulatory incompatibility. 
+
+## Gene-level Venn diagram for parent-like S genes
+```{r S_like_venn_genes}
+pls_genes <- list(
+  `12°C` = gene_lists$parent_like_S_12C,
+  `15°C` = gene_lists$parent_like_S_15C,
+  `18°C` = gene_lists$parent_like_S_18C
+)
+
+ggVennDiagram(pls_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#009E73") +
+  ggtitle("Overlap of Parent-like S Genes Across Temperatures")
+```
+
+
+South‑like inheritance shows a dip at 15°C but is otherwise similar across temperature treatments.
+
+## Gene-level Venn diagram for parent-like W genes
+```{r W_like_venn_genes}
+plw_genes <- list(
+  `12°C` = gene_lists$parent_like_W_12C,
+  `15°C` = gene_lists$parent_like_W_15C,
+  `18°C` = gene_lists$parent_like_W_18C
+)
+
+ggVennDiagram(plw_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#D55E00") +
+  ggtitle("Overlap of Parent-like W Genes Across Temperatures")
+```
+
+
+West‑like inheritance increases markedly with temperature, indicating a stronger tendency for hybrids to inherit a western population expression under warmer conditions.
+
+The limited overlaps across temperature treatments show that distinct gene sets are involved at each temperature, indicating treatment‑specific regulation rather than a fixed set of misexpressed or parent‑like genes.
+
+
+## Intersections with Tiers 1 and 2b
+
+## Load Tier 1 and Tier 2b gene sets
+```{r load_genes_tier_1_2}
+# Tier 1: shared temperature-responsive genes
+tier1_genes <- read.csv(
+  "results/functional_enrichment/tier1_shared_temperature_response/tier1_shared_temperature_genes.csv",
+  header = TRUE
+)$gene_id
+
+# Tier 2b: thermal local adaptation candidates
+tier2b_genes <- read.csv(
+  "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv",
+  header = TRUE
+)$gene_id
+```
+## Build Tier 3 gene sets (combined across temperatures)
+```{r genes_tier_3}
+
+# Misexpressed genes 
+misexpressed <- unique(c(
+  gene_lists$misexpressed_12C,
+  gene_lists$misexpressed_15C,
+  gene_lists$misexpressed_18C
+))
+
+# Parent-like S genes
+parent_like_S <- unique(c(
+  gene_lists$parent_like_S_12C,
+  gene_lists$parent_like_S_15C,
+  gene_lists$parent_like_S_18C
+))
+
+# Parent-like W genes
+parent_like_W <- unique(c(
+  gene_lists$parent_like_W_12C,
+  gene_lists$parent_like_W_15C,
+  gene_lists$parent_like_W_18C
+))
+```
+
+## Summary table of tier 3 gene sets (temperature combined)
+```{r sum_table_tier3_genes_combined}
+## Summary table of Tier 3 gene sets
+tier3_summary <- data.frame(
+  Category = c("Misexpressed", "Parent-like S", "Parent-like W"),
+  Count    = c(length(misexpressed),
+               length(parent_like_S),
+               length(parent_like_W))
+)
+
+DT::datatable(
+  tier3_summary,
+  options = list(pageLength = 5, scrollX = TRUE),
+  caption = "Sizes of Tier 3 Gene Sets (combined across temperatures)"
+)
+```
+
+```{r save_tier3_genes, echo=FALSE, results='hide'}
+# Save Tier 3 gene sets
+write_csv(data.frame(gene_id = misexpressed),
+          "results/functional_enrichment/tier3_hybrid_inheritance/tier3_misexpressed_genes.csv")
+
+write_csv(data.frame(gene_id = parent_like_S),
+          "results/functional_enrichment/tier3_hybrid_inheritance/tier3_parent_like_S_genes.csv")
+
+write_csv(data.frame(gene_id = parent_like_W),
+          "results/functional_enrichment/tier3_hybrid_inheritance/tier3_parent_like_W_genes.csv")
+```
+
+## Intersections with Tier 1 and Tier 2b
+```{r}
+# Tier 1 intersections
+tier1_misexpressed  <- intersect(tier1_genes, misexpressed)
+tier1_parent_like_S <- intersect(tier1_genes, parent_like_S)
+tier1_parent_like_W <- intersect(tier1_genes, parent_like_W)
+
+# Tier 2b intersections 
+tier2b_misexpressed  <- intersect(tier2b_genes, misexpressed)
+tier2b_parent_like_S <- intersect(tier2b_genes, parent_like_S)
+tier2b_parent_like_W <- intersect(tier2b_genes, parent_like_W)
+```
+
+## Summary table of Tier 1 & Tier 2b intersections
+```{r}
+intersection_summary <- data.frame(
+  Category = c("Misexpressed", "Parent-like S", "Parent-like W"),
+  
+  Tier1_Count = c(
+    length(tier1_misexpressed),
+    length(tier1_parent_like_S),
+    length(tier1_parent_like_W)
+  ),
+  
+  Tier2b_Count = c(
+    length(tier2b_misexpressed),
+    length(tier2b_parent_like_S),
+    length(tier2b_parent_like_W)
+  )
+)
+
+DT::datatable(
+  intersection_summary,
+  options = list(pageLength = 5, scrollX = TRUE),
+  caption = "Summary of Tier 1 and Tier 2b Intersections with Tier 3 Categories"
+)
+```
+```{r save_intersections, echo=FALSE, results='hide'}
+write_csv(tibble(gene_id = tier1_misexpressed),  "results/functional_enrichment/tier_intersections/tier1_tier3_misexpressed.csv")
+write_csv(tibble(gene_id = tier1_parent_like_S), "results/functional_enrichment/tier_intersections/tier1_tier3_parent_like_S.csv")
+write_csv(tibble(gene_id = tier1_parent_like_W), "results/functional_enrichment/tier_intersections/tier1_tier3_parent_like_W.csv")
+
+write_csv(tibble(gene_id = tier2b_misexpressed),  "results/functional_enrichment/tier_intersections/tier2b_tier3_misexpressed.csv")
+write_csv(tibble(gene_id = tier2b_parent_like_S), "results/functional_enrichment/tier_intersections/tier2b_tier3_parent_like_S.csv")
+write_csv(tibble(gene_id = tier2b_parent_like_W), "results/functional_enrichment/tier_intersections/tier2b_tier3_parent_like_W.csv")
+```
+
+
+## Long-format table of all intersected genes
+```{r}
+intersection_genes <- list(
+  Tier1_Misexpressed   = tier1_misexpressed,
+  Tier1_ParentLike_S   = tier1_parent_like_S,
+  Tier1_ParentLike_W   = tier1_parent_like_W,
+  Tier2b_Misexpressed  = tier2b_misexpressed,
+  Tier2b_ParentLike_S  = tier2b_parent_like_S,
+  Tier2b_ParentLike_W  = tier2b_parent_like_W
+)
+
+intersection_genes_df <- stack(intersection_genes)
+colnames(intersection_genes_df) <- c("Gene_ID", "Intersection")
+
+DT::datatable(
+  intersection_genes_df,
+  options = list(pageLength = 10, scrollX = TRUE),
+  caption = "Gene IDs in Each Tier 1 and Tier 2b Intersection"
+)
+```
+
+
+## Summary of annotation coverage for intersected gene sets.
+```{r}
+# Add annotation status
+intersection_genes_df$Has_Annotation <- intersection_genes_df$Gene_ID %in% universe_genes
+
+# Summary of annotation coverage
+annotation_status_summary <- intersection_genes_df %>%
+  dplyr::group_by(Intersection) %>%
+  dplyr::summarise(
+    Total_Genes = n(),
+    Annotated = sum(Has_Annotation),
+    Percent_Annotated = round(Annotated / Total_Genes * 100, 2)
+  )
+
+DT::datatable(
+  annotation_status_summary,
+  options = list(pageLength = 10, scrollX = TRUE),
+  caption = "Annotation Coverage for Intersected Gene Sets"
+)
+```
+
+
+
 

@@ -10,7 +10,6 @@ output:
 
 ## Setup and load required libraries
 ```{r packages, results='hide'}
-
 library(stringr)
 library(here)
 library(gprofiler2)

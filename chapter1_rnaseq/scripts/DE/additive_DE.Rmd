@@ -1,7 +1,7 @@
 ---
 title: "Differential Expression Analysis of Corwing Wrasse"
 author: "Carlota Myhre de Gouveia"
-date: "2025-10-03"
+date: "2025-24-04"
 output:
   html_document:
     toc: true
@@ -10,15 +10,14 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
 ```
 
 # Differential Expression Analysis with additive model
 
 ## Setup and Package Loading
 ```{r packages}
-# Set root directory
-here::i_am("scripts/additive_DE.Rmd")
-
 # Load necessary packages
 suppressPackageStartupMessages({
   library(tidyverse)
@@ -27,68 +26,70 @@ suppressPackageStartupMessages({
   library(ashr)
   library(grid)
   library(VennDiagram)
-  library(here)
+  library(readxl)
 })
 ```
 
-
 ## Data Import and Preprocessing
 ```{r load_data}
+# Load transcript abundance matrix
+abundance_matrix <- read.table("data/DE/abundance_matrix.txt",
+                               header = TRUE, row.names = 1, check.names = FALSE)
 
-# Load abundance matrix and sample information 
+colnames(abundance_matrix) <- sub(".*Melops", "", colnames(abundance_matrix))
 
-abundance_matrix <- read.table(here::here("data", "DE", "abundance_matrix.txt"), header = TRUE, row.names = 1)
-head(abundance_matrix)
+sample_info <- read_excel("data/sample_conditions_rnaseq.xlsx") %>%
+  mutate(
+    sample = sub("L", "", RNA_Later_ID),   # matches abundance matrix columns
+    origin = factor(Origin, levels = c("W","H","S")),
+    temperature = factor(`Temperature (celsius)`, levels = c(12,15,18)),
+    condition = factor(RNAseqgroup,
+                       levels = c("W12","W15","W18",
+                                  "H12","H15","H18",
+                                  "S12","S15","S18")),
+    length = scale(`Total length (mm)`)
+  ) %>%
+  select(sample, origin, temperature, condition, length)
 
-sample_info <- read.table(
-  here::here("data", "DE", "samples.txt"),
-  header = FALSE,
-  col.names = c("condition", "sample")
-)
-sample_info
+# Reorder sample_info rows to match abundance_matrix columns
+sample_info <- sample_info %>%
+  arrange(match(sample, colnames(abundance_matrix)))
+
+
+# Show preview of the abundance matrix
+knitr::kable(abundance_matrix[1:10, 1:10], caption = "Gene abundance matrix (first 10 genes × 10 samples)")
+
+# Show metadata
+knitr::kable(sample_info, caption = "Sample metadata")
 
 ```
 
 ## Prepare dataset and run DESeq2
 ```{r dataset_DESeq2_run}
+# Round counts and ensure non-negative integers
+abundance_matrix <- round(pmax(abundance_matrix, 0))
 
-# Parse temperature and origin from condition string. Assumes condition is formatted like "W12", "S15", etc.
-sample_info <- sample_info %>%
-  mutate(
-    origin = substr(condition, 1, 1),
-    temperature = substr(condition, 2, nchar(condition))
-  ) %>%
-  mutate(
-    origin = recode(origin, "W" = "West", "H" = "Hybrid", "S" = "South"),
-    temperature = factor(temperature, levels = c("12", "15", "18")),
-    origin = factor(origin)
-  )
-
-
-# Ensure column names of count matrix match sample names
-colnames(abundance_matrix) <- sample_info$sample
-
-# Round counts and ensure non-negative integers (required by DESeq2)
-abundance_matrix <- round(pmax(abundance_matrix, 0))  
-
-# Create DESeq2 dataset with additive model (temperature + origin) 
+# Create DESeq2 dataset with additive model
 dds <- DESeqDataSetFromMatrix(
   countData = abundance_matrix,
-  colData = sample_info,
-  design = ~ temperature + origin
+  colData   = sample_info,
+  design    = ~ temperature + origin + length
 )
 
-# Filter out lowly expressed transcripts (keep those with total count ≥ 10 across all sampl
+# Filter out lowly expressed transcripts (keep those with total count ≥ 10 across all samples
 dds <- dds[rowSums(counts(dds)) >= 10, ]
 # Run DESeq2 pipeline (estimate size factors, dispersions, and fit model)
 dds <- DESeq(dds)
 # Extract coefficient names for downstream contrasts
 coef_names <- resultsNames(dds)
 
-# Plot dispersion estimates across transcripts to assess fit to the negative binomial model used by DESeq2
+# Plot dispersion estimates across genes to assess fit to the negative binomial model used by DESeq2
 plotDispEsts(dds)
 
 ```
+
+The close alignment of blue points with the fitted trend indicates that the DESeq2 negative binomial model adequately captures dispersion, while occasional outliers at low counts are expected and corrected by shrinkage.
+
 
 ## Define contrasts
 ```{r define_contrasts}
@@ -162,16 +163,16 @@ run_contrast_analysis <- function(contrast_table, factor_name, output_dir, alpha
     
     results_list[[name]] <- res
     
-    # Extract significant transcripts based on adjusted p-value and log2 fold change threshold
+    # Extract significant genes based on adjusted p-value and log2 fold change threshold
     sig <- res[which(res$padj < alpha & abs(res$log2FoldChange) > lfcThreshold), ]
     up <- sum(sig$log2FoldChange > 0)
     down <- sum(sig$log2FoldChange < 0)
     
     # Save full and significant results to CSV
     write.csv(as.data.frame(res), file = here::here(output_dir, paste0(name, "_DE_results.csv")), row.names = TRUE)
-    write.csv(as.data.frame(sig), file = here::here(output_dir, paste0(name, "_significant_transcripts.csv")), row.names = TRUE)
+    write.csv(as.data.frame(sig), file = here::here(output_dir, paste0(name, "_significant_genes.csv")), row.names = TRUE)
     
-    # Generate and save MA plot with up/downregulated transcript counts
+    # Generate and save MA plot with up/downregulated gene counts
     png(filename = here::here(output_dir, paste0(name, "_MA_plot.png")), width = 800, height = 600)
     plotMA(res, ylim = c(-10, 10), main = paste("MA Plot:", name, "-", shrinkage), alpha = alpha, colSig = "red")
     text(x = max(res$baseMean, na.rm = TRUE) * 0.7, y = 9, labels = paste("↑:", up), col = "blue", cex = 0.8)
@@ -211,11 +212,14 @@ print(temperature_results$summary)
 ## Save summary table
 write.csv(
   temperature_results$summary,
-  here::here("results", "DE", "temperature_contrast_additive_model", "contrast_summary.csv"),
+  "results/DE/temperature_contrast_additive_model/contrast_summary.csv",
   row.names = FALSE
 )
 
 ```
+
+More genes were differentially expressed between 12°C and 15°C than between 15°C and 18°C, suggesting that transcriptional responsiveness is strongest at the lower end of the temperature treatments.
+
 
 ## Origin contrast
 ```{r origin_contrast}
@@ -231,21 +235,25 @@ print(origin_results$summary)
 ## Save summary table
 write.csv(
   origin_results$summary,
-  here::here("results", "DE", "origin_contrast_additive_model", "contrast_summary.csv"),
+  "results/DE/origin_contrast_additive_model/contrast_summary.csv",
   row.names = FALSE
 )
 ```
+
+
+The West vs South comparison yielded 1,498 DE genes, highlighting strong transcriptional divergence between parental populations. In contrast, hybrid comparisons revealed far fewer DE genes (214 vs West, 219 vs South), showing that hybrids resemble both parental populations overall, though they also exhibit distinct differences in a subset of genes.
 
 
 # Venn diagrams
 
 ## Define venn plotting function
 ```{r define_plot_venn_function}
-# Plot Venn diagram to visualize overlap between sets of significant transcripts
-plot_venn <- function(transcript_lists, contrast_name, output_dir) {
+
+# Plot Venn diagram to visualize overlap between sets of significant genes
+plot_venn <- function(genes_lists, contrast_name, output_dir) {
   venn_plot <- venn.diagram(
-    x = transcript_lists,
-    category.names = names(transcript_lists),
+    x = genes_lists,
+    category.names = names(genes_lists),
     filename = NULL,
     fill = c("red", "green", "blue"),
     alpha = 0.5,
@@ -253,7 +261,7 @@ plot_venn <- function(transcript_lists, contrast_name, output_dir) {
     fontface = "bold"
   )
   
-  png(filename = here::here(output_dir, paste0("venn_", contrast_name, ".png")), width = 800, height = 800)
+  png(filename = file.path(output_dir, paste0("venn_", contrast_name, ".png")), width = 800, height = 800)
   grid.newpage()
   grid.draw(venn_plot)
   dev.off()
@@ -264,53 +272,45 @@ plot_venn <- function(transcript_lists, contrast_name, output_dir) {
 
 ```
 
-## Prepare DE transcripts sets and plot venn diagrams for temperature contrast
+## Prepare DE gene sets and plot venn diagrams for temperature contrast
 ```{r temperature_venn}
-
 # Prepare DE sets for temperature contrasts
 temp_contrasts <- c("15_vs_12", "18_vs_15", "18_vs_12")
 temp_sets <- setNames(lapply(temp_contrasts, function(name) {
-  file <- here::here("results", "DE", "temperature_contrast_additive_model", paste0(name, "_significant_transcripts.csv"))
+  file <- file.path("results/DE/temperature_contrast_additive_model", paste0(name, "_significant_genes.csv"))
   rownames(read.csv(file, row.names = 1))
 }), c("15 vs 12", "18 vs 15", "18 vs 12"))
 
 # Plot Venn diagram
 plot_venn(temp_sets, "temperature_contrasts", "results/DE/temperature_contrast_additive_model")
-
 ```
 
 ## Prepare DE transcripts sets and plot venn diagrams for origin contrast
 ```{r origin_venn}
 
-# Prepare DE sets for origin contrasts
-origin_contrasts <- c("South_vs_Hybrid", "West_vs_Hybrid", "West_vs_South")
-origin_labels <- c("South vs Hybrid", "West vs Hybrid", "West vs South")
+origin_contrasts <- c("H_vs_W", "S_vs_W", "S_vs_H")
+origin_labels    <- c("Hybrid vs West", "South vs West", "South vs Hybrid")
 
 origin_sets <- setNames(lapply(seq_along(origin_contrasts), function(i) {
-  file <- here::here("results", "DE", "origin_contrast_additive_model", paste0(origin_contrasts[i], "_significant_transcripts.csv"))
+  file <- file.path("results/DE/origin_contrast_additive_model",
+                    paste0(origin_contrasts[i], "_significant_genes.csv"))
   rownames(read.csv(file, row.names = 1))
 }), origin_labels)
 
 # Plot Venn diagram
 plot_venn(origin_sets, "origin_contrasts", "results/DE/origin_contrast_additive_model")
-
 ```
 
-## Function to load transcript sets
-```{r define_load_transcript_sets_function}
+## Function to load genes sets
+```{r define_load_gene_sets_function}
 
-# Load significant transcript sets used to visualize shared and unique DE transcripts across conditions
-load_transcript_sets <- function(contrast_names, contrast_dir) {
+# Load significant gene sets used to visualize shared and unique DE genes across conditions
+load_gene_sets <- function(contrast_names, contrast_dir) {
   sets <- list()
   for (name in contrast_names) {
-    file <- here::here("results", "DE", contrast_dir, paste0(name, "_significant_transcripts.csv"))
-    if (file.exists(file)) {
-      df <- read.csv(file, row.names = 1)
-      sets[[name]] <- rownames(df)
-    } else {
-      warning(paste("File not found:", file))
-      sets[[name]] <- character(0)
-    }
+    file <- file.path("results/DE", contrast_dir, paste0(name, "_significant_genes.csv"))
+    df <- read.csv(file, row.names = 1)
+    sets[[name]] <- rownames(df)
   }
   return(sets)
 }
@@ -319,7 +319,7 @@ load_transcript_sets <- function(contrast_names, contrast_dir) {
 
 ## Function to summarize Venn regions
 ```{r define_venn_summary_table_function}
-# Summarize the number of transcripts in each Venn region (shared or unique across contrasts)
+# Summarize the number of genes in each Venn region (shared or unique across contrasts)
 venn_summary_table <- function(sets) {
   all_genes <- unique(unlist(sets))
   summary <- sapply(all_genes, function(gene) {
@@ -336,108 +336,133 @@ venn_summary_table <- function(sets) {
 ## Temperature Venn summary
 ```{r temperature_venn_summary}
 temp_contrasts <- c("15_vs_12", "18_vs_15", "18_vs_12")
-temp_sets <- load_transcript_sets(temp_contrasts, "temperature_contrast_additive_model")
+temp_sets <- load_gene_sets(temp_contrasts, "temperature_contrast_additive_model")
 temp_venn_summary <- venn_summary_table(temp_sets)
 print(temp_venn_summary)
 
 # Save venn summary
 write.csv(
   temp_venn_summary,
-  here::here("results", "DE", "temperature_contrast_additive_model", "venn_summary.csv"),
+  "results/DE/temperature_contrast_additive_model/venn_summary.csv",
   row.names = FALSE
 )
 ```
 
 ## Origin Venn summary
 ```{r origin_venn_summary}
-origin_contrasts <- c("South_vs_Hybrid", "West_vs_Hybrid", "West_vs_South")
-origin_sets <- load_transcript_sets(origin_contrasts, "origin_contrast_additive_model")
+origin_contrasts <- c("H_vs_W", "S_vs_W", "S_vs_H")
+origin_sets <- load_gene_sets(origin_contrasts, "origin_contrast_additive_model")
 origin_venn_summary <- venn_summary_table(origin_sets)
 print(origin_venn_summary)
 
 # Save venn summary
 write.csv(
   origin_venn_summary,
-  here::here("results", "DE", "origin_contrast_additive_model", "venn_summary.csv"),
+  "results/DE/origin_contrast_additive_model/venn_summary.csv",
   row.names = FALSE
 )
 ```
 
-# Transcript Extraction for functional enrichment
+# Gene Extraction for functional enrichment
 
-## Tier 1: Shared temperature-responsive transcripts across origins. Candidates for general temperature response. 
+## Tier 1: Shared temperature-responsive genes across origins. Candidates for general temperature response. 
 
 ### Biological Rationale
 
-Tier 1 identifies transcripts that are consistently regulated by temperature across all origins. By intersecting results from all pairwise temperature contrasts, this approach isolates genes involved in a general thermal response, independent of population-specific effects.
+Tier 1 identifies genes that are consistently regulated by temperature across all origins. By intersecting results from all pairwise temperature contrasts, this approach isolates genes involved in a general thermal response, independent of population-specific effects.
 
-```{r extract_tier1_transcripts}
-
-# Extract transcripts that are consistently DE across all temperature contrasts. 
-tier1_transcripts <- Reduce(intersect, temp_sets)
+```{r extract_tier1_genes}
+# Extract genes that are consistently DE across all temperature contrasts
+tier1_genes <- Reduce(intersect, temp_sets)
 
 # Save for functional enrichment
 write.csv(
-  data.frame(transcript_id = tier1_transcripts),
-  here::here("results", "functional_enrichment", "tier1_shared_temperature_response", "tier1_shared_temperature_transcripts.csv"),
+  data.frame(gene_id = tier1_genes),
+  "results/functional_enrichment/tier1_shared_temperature_response/tier1_shared_temperature_genes.csv",
   row.names = FALSE
 )
 ```
 
-
-## Tier 2: Local adaptation candidates (constitutive + plasticity divergence)
+## Tier 2: Constitutive divergence (West vs South)
 
 ### Biological Rationale
 
-Tier 2 aims to identify transcripts that may be involved in **local adaptation** between corkwing wrasse populations. These candidates are defined by the **overlap between constitutive differences and interaction effects**:
+Tier 2 identifies genes that show baseline expression differences between West and South origins while controlling for temperature. These represent population‑level divergence patterns that are consistent across temperatures and may reflect fixed genetic divergence.
 
-- **Constitutive differences** are identified using the additive model (`~ origin + temperature`) by comparing origins (West vs South) while controlling for temperature. These represent **baseline expression differences** that are consistent across temperatures and may reflect fixed genetic divergence.
+```{r extract_tier2_genes}
+# Load constitutive origin differences (South vs West)
+pop_divergence_file <- "results/DE/origin_contrast_additive_model/S_vs_W_significant_genes.csv"
+tier2_genes <- rownames(read.csv(pop_divergence_file, row.names = 1))
+
+# Save for functional enrichment
+write.csv(
+  data.frame(gene_id = tier2_genes),
+  "results/functional_enrichment/tier2_pop_divergence/tier2_pop_divergence_genes.csv",
+  row.names = FALSE
+)
+```
+
+## Tier 2b: Local thermal adaptation candidates (divergence + plasticity overlap)
+
+### Biological Rationale
+
+Tier 2b  aims to identify genes that may be involved in thermal local adaptation between the south and the west populations. These candidates are defined by the overlap between constitutive differences from tier 2 and genes that showed significantly improved fit when including the interaction term.
+
+- **Constitutive differences** are identified using the additive model (`~ origin + temperature + length`) by comparing origins (West vs South) while controlling for temperature. These represent **baseline expression differences** that are consistent across temperatures and may reflect fixed genetic divergence.
 
 - **Interaction effects** are identified using a likelihood ratio test (LRT) comparing models with and without the `origin:temperature` interaction term. These transcripts show **origin-specific responses to temperature**, indicating **plasticity divergence**.
 
 By intersecting these two sets, we isolate transcripts that are:
 - **Diverged between origins**, and
 - **Differentially responsive to temperature depending on origin**
+This overlap represents the strongest candidates for thermal local adaptation, as they combine constitutive divergence with temperature‑responsive regulation.
 
-This overlap represents the **strongest candidates for local adaptation**, as they combine fixed and environmentally responsive divergence.
-```{r extract_tier2_transcripts}
+```{r extract_tier2b_genes}
+# Use Tier 2 genes
+constitutive_genes <- tier2_genes
 
-# Load constitutive origin differences (South vs West)
-constitutive_file <- here::here("results", "DE", "origin_contrast_additive_model", "West_vs_South_significant_transcripts.csv")
-constitutive_transcripts <- rownames(read.csv(constitutive_file, row.names = 1))
+# Load interaction effect genes from LRT
+interaction_file <- "results/DE/interaction_effects/significant_interaction_genes.csv"
+interaction_genes <- rownames(read.csv(interaction_file, row.names = 1))
 
-# Load interaction effect transcripts from LRT script
-interaction_file <- here::here("results", "DE", "interaction_effects", "significant_interaction_transcripts.csv")
-interaction_transcripts <- rownames(read.csv(interaction_file, row.names = 1))
+# Overlap = strongest candidates for local thermal adaptation
+tier2b_genes <- intersect(constitutive_genes, interaction_genes)
 
-# Overlap = strongest candidates for local adaptation
-tier2_transcripts <- intersect(constitutive_transcripts, interaction_transcripts)
-
-# Save for functional enrichment
+# Save for functional enrichment (nested under Tier 2 folder)
 write.csv(
-  data.frame(transcript_id = tier2_transcripts),
-  here::here("results", "functional_enrichment", "tier2_local_adaptation", "tier2_local_adaptation_candidates.csv"),
+  data.frame(gene_id = tier2b_genes),
+  "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv",
   row.names = FALSE
 )
 ```
 
-**Tier 3: Hybrid misregulation**
-Tier 3 is analyzed separately using the condition model, where each origin-temperature combination is treated as a distinct group. This approach identifies transcripts where hybrids differ from both parental origins at a given temperature. Misregulated transcripts can be further classified as transgressive or intermediate based on expression direction.
+**Tier 3: Hybrid Inheritance**
+In contrast to the other tiers, Tier 3 was analyzed separately using the condition model applied to an isoform‑level abundance matrix rather than a gene‑level matrix. Each origin–temperature combination was treated as a distinct group, allowing us to identify transcripts differentially expressed in hybrids relative to parental lines. This separate analysis highlights how parental expression programs are inherited, maintained, or disrupted in hybrids.
 
-## Summary of Transcript Extraction
-```{r transcript_summary}
+
+## Summary of Gene Extraction
+```{r gene_summary}
+# Summarize the number of genes extracted for each tier
 data.frame(
-  Tier = c("Tier 1", "Tier 2"),
-  Transcripts = c(length(tier1_transcripts), length(tier2_transcripts))
+  Tier = c("Tier 1", "Tier 2", "Tier 2b"),
+  Genes = c(
+    length(tier1_genes),
+    length(tier2_genes),
+    length(tier2b_genes)
+  )
 )
 ```
 
 # Summary
 
 This script performs Tier 1 and Tier 2 differential expression analyses using an additive DESeq2 model to investigate temperature responses and local adaptation in *Symphodus melops*.
-Pairwise temperature contrasts revealed 585 transcripts consistently regulated by temperature across all origins (Tier 1). For Tier 2, constitutive origin differences were defined using West vs South origin fish, and their overlap with transcripts showing origin-dependent temperature responses yielded 32 strong candidates for local adaptation. These transcript sets were extracted and saved for downstream functional enrichment.
+Pairwise temperature contrasts revealed 593 genes consistently regulated by temperature across all origins (Tier 1). For Tier 2, constitutive origin differences were defined using West vs. South origin fish, representing baseline population divergence. The overlap of these divergence genes with genes showing origin‑dependent temperature responses yielded 45 strong candidates for thermal local adaptation (Tier 2b). These gene sets were extracted and saved for downstream functional enrichment.
+
 
 # Session Info
 ```{r session_info} 
 sessionInfo()
 ```
+
+
+

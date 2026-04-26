@@ -282,4 +282,44 @@ plot_venn(west_vs_hybrids, "west_vs_hybrids", "results/DE/origin_contrast")
 ```
 
 
+-----
+## Create and save summary tables 
+```{r}
+library(dplyr)
+library(readr)
+
+# Function to summarize DE results
+summarize_DE <- function(files_dir) {
+  files <- list.files(files_dir, pattern = "_DE_results.csv$", full.names = TRUE)
+  summary <- data.frame()
+  
+  for (f in files) {
+    df <- read_csv(f)
+    comp <- gsub("_DE_results.csv", "", basename(f))
+    
+    # Count DE genes
+    n_up <- sum(df$padj < 0.05 & df$log2FoldChange > 0, na.rm = TRUE)
+    n_down <- sum(df$padj < 0.05 & df$log2FoldChange < 0, na.rm = TRUE)
+    
+    summary <- rbind(summary, data.frame(
+      Comparison = comp,
+      Upregulated = n_up,
+      Downregulated = n_down
+    ))
+  }
+  return(summary)
+}
+
+# Summaries for temperature and origin contrasts
+temp_summary <- summarize_DE("results/DE/temperature_contrast_condition_model")
+origin_summary <- summarize_DE("results/DE/origin_contrast_condition_model")
+
+# Print tables
+print(temp_summary)
+print(origin_summary)
+
+# Optionally save them
+write_csv(temp_summary, "results/DE/temperature_contrast_condition_model/summary_table.csv")
+write_csv(origin_summary, "results/DE/origin_contrast_condition_model/summary_table.csv")
+```
 

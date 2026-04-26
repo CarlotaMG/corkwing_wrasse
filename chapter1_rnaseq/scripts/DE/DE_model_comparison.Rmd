@@ -1,7 +1,7 @@
 ---
-title: "Model Comparison and Transcript Extraction for Tier 2"
+title: "Model Comparison and Gene Extraction for Tier 2b"
 author: "Carlota Myhre de Gouveia"
-date: "2025-10-03"
+date: "2026-09-04"
 output:
   html_document:
     toc: true
@@ -10,76 +10,120 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
 ```
 
 # Model comparison via likelihood ratio tests (LRTs)
 
 ## Setup and load required libraries
 ```{r packages, results='hide'}
-# Set root directory
-here::i_am("scripts/DE_model_comparison.Rmd")
-
 # Load libraries 
 suppressPackageStartupMessages({
   library(DESeq2)
   library(tidyverse)
   library(dplyr)
   library(UpSetR)
-  library(here)
   library(ggplot2)
   library(variancePartition)
   library(BiocParallel)
   library(limma)
+  library(readxl)
+	library(knitr)
+	library(pheatmap)
 })
 ```
 
+
 ## Data Import and Preprocessing
 ```{r load_data}
-# Load transcript abundance matrix 
-abundance_matrix <- read.table(here::here("data", "DE", "abundance_matrix.txt"), header = TRUE, row.names = 1, check.names = FALSE)
-head(abundance_matrix)
+# Load transcript abundance matrix
+abundance_matrix <- read.table("data/DE/abundance_matrix.txt",
+                               header = TRUE, row.names = 1, check.names = FALSE)
 
-# Load sample metadata
-sample_info <- read.table(here::here("data", "DE", "samples.txt"), header = FALSE, col.names = c("condition", "sample"))
+colnames(abundance_matrix) <- sub(".*Melops", "", colnames(abundance_matrix))
 
-# Parse temperature and origin from condition
-sample_info <- sample_info %>%
+sample_info <- read_excel("data/sample_conditions_rnaseq.xlsx") %>%
   mutate(
-    origin = substr(condition, 1, 1),
-    temperature = substr(condition, 2, nchar(condition))
+    sample = sub("L", "", RNA_Later_ID),   # matches abundance matrix columns
+    origin = factor(Origin, levels = c("W","H","S")),
+    temperature = factor(`Temperature (celsius)`, levels = c(12,15,18)),
+    condition = factor(RNAseqgroup,
+                       levels = c("W12","W15","W18",
+                                  "H12","H15","H18",
+                                  "S12","S15","S18")),
+    length = scale(`Total length (mm)`)
   ) %>%
-  mutate(
-    origin = recode(origin, "W" = "West", "H" = "Hybrid", "S" = "South"),
-    temperature = factor(temperature, levels = c("12", "15", "18")),
-    origin = factor(origin)
-  )
-sample_info
+  select(sample, origin, temperature, condition, length)
+
+# Reorder sample_info rows to match abundance_matrix columns
+sample_info <- sample_info %>%
+  arrange(match(sample, colnames(abundance_matrix)))
+
+
+# Show preview of the abundance matrix
+knitr::kable(abundance_matrix[1:10, 1:10], caption = "Gene abundance matrix (first 10 genes × 10 samples)")
+
+# Show metadata
+knitr::kable(sample_info, caption = "Sample metadata")
+
 ```
 
 ## Prepare abundance matrix
 ```{r prep_abundance_matrix}
-# Match column names 
-colnames(abundance_matrix) <- sample_info$sample
 
 # Ensure non-negative integer count
 abundance_matrix <- round(pmax(abundance_matrix, 0))  
 
 # Keep transcripts with total count ≥ 10 across all samples
-keep_transcripts <- rowSums(abundance_matrix) >= 10
-abundance_matrix <- abundance_matrix[keep_transcripts, ]
+keep_genes <- rowSums(abundance_matrix) >= 10
+abundance_matrix <- abundance_matrix[keep_genes, ]
 ```
+
 
 ## Create DESeq2 datasets for each model
 ```{r define_model_datasets}
-# Define condition model
-dds_condition <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ condition)
 
-# Define additive model
-dds_additive <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ temperature + origin)
+# Condition model
+dds_condition <- DESeqDataSetFromMatrix(
+  countData = abundance_matrix,
+  colData   = sample_info,
+  design    = ~ condition + length
+)
 
-# Define interaction model
-dds_interaction <- DESeqDataSetFromMatrix(countData = abundance_matrix, colData = sample_info, design = ~ temperature * origin)
+# Additive model
+dds_additive <- DESeqDataSetFromMatrix(
+  countData = abundance_matrix,
+  colData   = sample_info,
+  design    = ~ temperature + origin + length
+)
+
+# Interaction model
+dds_interaction <- DESeqDataSetFromMatrix(
+  countData = abundance_matrix,
+  colData   = sample_info,
+  design    = ~ temperature * origin + length
+)
 ```
+
+## Compare simple additive vs additive with lenght
+```{r ltr_add_vs_add_len}
+## Run DESeq2 for length-adjusted additive model
+dds_additive <- DESeq(dds_additive)
+
+## Compare additive with length vs simple additive (testing length effect)
+dds_lrt_length_vs_add <- DESeq(
+  dds_additive,
+  test    = "LRT",
+  reduced = ~ temperature + origin
+)
+
+res_length_vs_add <- results(dds_lrt_length_vs_add, alpha = 0.05)
+summary(res_length_vs_add)
+```
+
+The likelihood ratio test comparing the additive model with and without length identified 6,900 genes where body size explained significant variation. Because body size serves as a proxy for developmental stage, we included length as a covariate in all subsequent models. This ensures that observed effects in condition, additive, and interaction analyses reflect biological factors of interest rather than developmental differences
+
 
 ## Run DESeq2 for full model
 ```{r run_DESeq2}
@@ -88,13 +132,17 @@ dds_interaction <- DESeq(dds_interaction)
 
 ## Compare interaction vs additive model
 ```{r ltr_interaction_vs_additive}
-dds_lrt_inter_vs_add <- DESeq(dds_interaction, test = "LRT", reduced = ~ temperature + origin)
+dds_lrt_inter_vs_add <- DESeq(
+  dds_interaction,
+  test    = "LRT",
+  reduced = ~ temperature + origin + length
+)
 res_inter_vs_add <- results(dds_lrt_inter_vs_add, alpha = 0.05)
 summary(res_inter_vs_add)
-```
 
-## Extract transcripts with significant interaction effects for Tier 2. These are candidates for origin-specific temperature responses.
-```{r extract_interaction_transcripts_for_tier2}
+```
+## Extract genes with significant interaction effects for Tier 2b. These are candidates for origin-specific temperature responses.
+```{r extract_interaction_genes_for_tier2b}
 
 # Filter transcripts with adjusted p-value < 0.05 from the LRT
 interaction_transcripts <- rownames(res_inter_vs_add)[which(res_inter_vs_add$padj < 0.05)]
@@ -102,12 +150,12 @@ interaction_transcripts <- rownames(res_inter_vs_add)[which(res_inter_vs_add$pad
 # Save to file for use in additive model DE script (Tier 2 overlap)
 write.csv(
   data.frame(transcript_id = interaction_transcripts),
-  here::here("results", "DE", "interaction_effects", "significant_interaction_transcripts.csv"),
+  "results/DE/interaction_effects/significant_interaction_genes.csv",
   row.names = FALSE
 )
 
 # Print number of transcripts
-cat("Number of transcripts with significant interaction effects:", length(interaction_transcripts), "\n")
+cat("Number of genes with significant interaction effects:", length(interaction_transcripts), "\n")
 ```
 
 ## Compare condition vs null model
@@ -133,15 +181,14 @@ res_inter_vs_null <- results(dds_lrt_inter_vs_null, alpha = 0.05)
 summary(res_inter_vs_null)
 ```
 
-
 ## Visualize results
 ```{r model_overlap}
 
-# Create list of significant transcripts from each comparison
+# Create list of significant genes from each comparison
 listInput <- list(
   Inter_vs_Add = rownames(res_inter_vs_add)[which(res_inter_vs_add$padj < 0.05)],
   Cond_vs_Null = rownames(res_cond_vs_null)[which(res_cond_vs_null$padj < 0.05)],
-  Add_vs_Null = rownames(res_add_vs_null)[which(res_add_vs_null$padj < 0.05)],
+  Add_vs_Null  = rownames(res_add_vs_null)[which(res_add_vs_null$padj < 0.05)],
   Inter_vs_Null = rownames(res_inter_vs_null)[which(res_inter_vs_null$padj < 0.05)]
 )
 
@@ -149,26 +196,26 @@ listInput <- list(
 upset(fromList(listInput), order.by = "freq", main.bar.color = "steelblue")
 
 # Intersection table
-all_transcripts <- unique(unlist(listInput))
+all_genes <- unique(unlist(listInput))
 presence_df <- tibble(
-  transcript = all_transcripts,
-  Inter_vs_Add = all_transcripts %in% listInput$Inter_vs_Add,
-  Cond_vs_Null = all_transcripts %in% listInput$Cond_vs_Null,
-  Add_vs_Null = all_transcripts %in% listInput$Add_vs_Null,
-  Inter_vs_Null = all_transcripts %in% listInput$Inter_vs_Null
+  gene = all_genes,
+  Inter_vs_Add = all_genes %in% listInput$Inter_vs_Add,
+  Cond_vs_Null = all_genes %in% listInput$Cond_vs_Null,
+  Add_vs_Null  = all_genes %in% listInput$Add_vs_Null,
+  Inter_vs_Null = all_genes %in% listInput$Inter_vs_Null
 )
 
 summary_table <- presence_df %>%
   group_by(Inter_vs_Add, Cond_vs_Null, Add_vs_Null, Inter_vs_Null) %>%
-  summarise(TranscriptCount = n(), .groups = "drop") %>%
-  arrange(desc(TranscriptCount))
+  summarise(GeneCount = n(), .groups = "drop") %>%
+  arrange(desc(GeneCount))
 
 print(summary_table)
 
 # Totals for each model
 totals_table <- tibble(
   Model = c("Interaction vs Additive", "Condition vs Null", "Additive vs Null", "Interaction vs Null"),
-  SignificantTranscripts = c(
+  SignificantGenes = c(
     length(listInput$Inter_vs_Add),
     length(listInput$Cond_vs_Null),
     length(listInput$Add_vs_Null),
@@ -180,10 +227,14 @@ print(totals_table)
 
 ```
 
+The overlap analysis shows that the additive vs null comparison yielded the largest set of significant genes (26,402), including 3,810 genes unique to the additive model. In contrast, the condition vs null and interaction vs null comparisons each identified 24,736 genes, with nearly identical sets because both models flexibly partition variance across origin–temperature combinations. Within this overlap, 2,053 genes were significant in condition and interaction models but not in the additive framework, reflecting transcripts that are only detected when variance is modeled at the full condition level. The interaction vs additive comparison identified only 977 genes (0.6%), highlighting a small subset where the interaction term improves fit. Together, these results indicate that the additive model not only captures the broadest biological signal but also contributes a larger number of unique genes compared to the condition and interaction frameworks, while the condition/interaction models identify a modest subset of genes tied to fine‑grained group effects.
+
+
 # Variance partition
 
 ## Setup and shared data
 ```{r setup_variance_partition}
+
 # Register parallel backend 
 register(SnowParam(4))  
 
@@ -192,47 +243,52 @@ vsd <- vst(dds_interaction, blind = FALSE)
 expr_matrix <- assay(vsd)
 metadata <- as.data.frame(colData(vsd))
 
-# Filter out low-variance transcripts
+# Sanity check: ensure sample names align
+stopifnot(setequal(colnames(expr_matrix), rownames(metadata)))
+
+# Filter out low-variance genes
 expr_filtered <- expr_matrix[rowVars(expr_matrix) > 0.1, ]
 
 # Ensure factors
 metadata$origin <- factor(metadata$origin)
 metadata$temperature <- factor(metadata$temperature)
 
-# Set the rownames of sample_info to match the expression matrix for variance partition on the condition model
-rownames(sample_info) <- sample_info$sample
-
 ```
 
-## Check number of filtered transcripts
+## Check number of filtered genes
 ```{r check_filtering}
-# Number of transcripts before filtering
+# Number of genes before filtering
 n_before <- nrow(expr_matrix)
 
-# Number of transcripts after filtering
+# Number of genes after filtering
 n_after <- nrow(expr_filtered)
 
-# Number of transcripts removed
+# Number of genes removed
 n_removed <- n_before - n_after
 
-cat("Transcripts before filtering:", n_before, "\n")
-cat("Transcripts after filtering:", n_after, "\n")
-cat("Transcripts removed:", n_removed, "\n")
+cat("Genes before filtering:", n_before, "\n")
+cat("Genes after filtering:", n_after, "\n")
+cat("Genes removed:", n_removed, "\n")
 
 ```
 
 ## Variance partition and plotting
 ```{r run_and_plot_variance_partition}
 
-# Run variance partitioning
-form_condition <- ~ (1|condition)
-form_additive <- ~ (1|origin) + (1|temperature)
-form_interaction <- ~ (1|origin) + (1|temperature) + (1|origin:temperature)
+# Define formulas
+form_condition   <- ~ (1|condition) + length
+form_additive    <- ~ (1|origin) + (1|temperature) + length
+form_interaction <- ~ (1|origin) + (1|temperature) + (1|origin:temperature) + length
 
+# Fit models
+fit_condition   <- fitVarPartModel(expr_filtered, form_condition, metadata)
+fit_additive    <- fitVarPartModel(expr_filtered, form_additive, metadata)
+fit_interaction <- fitVarPartModel(expr_filtered, form_interaction, metadata)
 
-varPart_condition <- fitExtractVarPartModel(expr_filtered, form_condition, sample_info)
-varPart_additive <- fitExtractVarPartModel(expr_filtered, form_additive, metadata)
-varPart_interaction <- fitExtractVarPartModel(expr_filtered, form_interaction, metadata)
+# Extract variance explained
+varPart_condition   <- extractVarPart(fit_condition)
+varPart_additive    <- extractVarPart(fit_additive)
+varPart_interaction <- extractVarPart(fit_interaction)
 
 
 # Plot 1: Condition model
@@ -274,8 +330,43 @@ ggplot(vp_combined, aes(x = Factor, y = Variance, fill = Model)) +
 
 
 ```
+Boxplots and violin plots show that temperature consistently explains the largest share of variance, while origin contributes little.
 
-# MDS Plot: Sample Clustering
+## Lenght correlations
+```{r len_correlations}
+cor(as.numeric(metadata$length), as.numeric(metadata$origin))
+cor(as.numeric(metadata$length), as.numeric(metadata$temperature))
+```
+The correlation between length and origin was weak (r ≈ 0.14), suggesting that body length is largely independent of population of origin. In contrast, length showed a modest negative correlation with temperature (r ≈ –0.26), indicating that individuals from higher temperature treatments tended to be slightly shorter. 
+Together, these results imply that length is not confounded with origin, but partially overlaps with temperature effects. Since variance partitioning showed that length explains more variance in gene expression than origin, it represents an important axis of biological variation. Including length as a fixed effect in downstream models helps control for growth differences while still allowing clear interpretation of origin and temperature effects.
+
+
+## Average variance explained by each factor across models
+```{r variance table}
+# Compute averages separately
+avg_condition   <- colMeans(varPart_condition)
+avg_additive    <- colMeans(varPart_additive)
+avg_interaction <- colMeans(varPart_interaction)
+
+# Convert each to tidy format
+df_condition   <- data.frame(Factor = names(avg_condition),   Condition   = avg_condition)
+df_additive    <- data.frame(Factor = names(avg_additive),    Additive    = avg_additive)
+df_interaction <- data.frame(Factor = names(avg_interaction), Interaction = avg_interaction)
+
+# Join them by Factor
+avg_var <- full_join(df_condition, df_additive, by="Factor") %>%
+           full_join(df_interaction, by="Factor")
+
+# Display table
+kable(avg_var, digits = 3,
+      caption = "Average variance explained by each factor across models")
+```
+Model choice justification: Variance partitioning showed that temperature (~22–24%) and length (~7–8%) were the dominant sources of variance, while origin contributed little (~3%). The origin × temperature interaction explained ~5–6% variance overall, and likelihood ratio tests identified only ~1% of genes with significant interaction effects. Because the interaction term contributes modestly at the global level, we adopted the additive model for variance partitioning to maintain parsimony and interpretability. Interaction‑responsive genes identified by LTR were analyzed separately to highlight population‑specific responses to temperature.
+
+
+# Sample Clustering
+
+## MDS Plot
 ```{r mds_plot, fig.width=8, fig.height=6}
 # Compute Euclidean distance matrix
 dist_matrix <- dist(t(assay(vsd)))  # transpose so samples are rows
@@ -288,28 +379,65 @@ mds_df$Sample <- colnames(vsd)
 mds_df <- cbind(mds_df, as.data.frame(colData(vsd)))
 
 # Plot MDS with color by Temperature and shape by Origin
-ggplot(mds_df, aes(x = MDS1, y = MDS2, color = factor(temperature), shape = factor(origin))) +
+ggplot(mds_df, aes(x = MDS1, y = MDS2, 
+                   color = factor(temperature), shape = factor(origin))) +
   geom_point(size = 3) +
-  labs(
-    title = "MDS Plot of Trinity-derived Counts",
-    color = "Temperature",
-    shape = "Origin"
-  ) +
+  stat_ellipse(aes(group = temperature), type = "t", level = 0.95, linetype = 2) +
+  labs(title = "MDS Plot of Trinity-derived Counts",
+       color = "Temperature", shape = "Origin") +
   theme_minimal(base_size = 14)
 
 # Save to file
 ggsave(
-  filename = here::here("results", "sample_clustering", "MDS", "MDS_plot.png"),
+  filename = "results/sample_clustering/MDS/MDS_plot.png",
   width = 8, height = 6, dpi = 300
 )
+
 ```
+Samples cluster primarily by temperature, with weaker separation by origin, supporting the additive model.
+
+## Sample-to-sample distance heatmap
+```{r sample_distance_heatmap}
+## Sample-to-sample distance heatmap
+sampleDists <- dist(t(expr_matrix))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- colnames(expr_matrix)
+colnames(sampleDistMatrix) <- colnames(expr_matrix)
+
+# Use only categorical annotations
+ann_col <- metadata %>%
+  select(condition, origin, temperature) %>%
+  as.data.frame()
+rownames(ann_col) <- metadata$sample
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         annotation_col = ann_col,
+         main = "Sample-to-sample distances")
+```
+
+
+
+The sample‑to‑sample distance heatmap revealed clear grouping of individuals at 12°C across origins, while clustering among the 15°C and 18°C conditions was less distinct. This indicates that temperature is the dominant factor structuring transcriptomic profiles, whereas population origin contributed little, and the nine experimental groups did not form fully distinct clusters.
+
 # Summary
 
-This script compares condition, additive, and interaction models using variance partitioning and LRTs to evaluate differential expression patterns in *Symphodus melops*. The condition model explained the highest proportion of variance, reflecting its flexibility in treating each origin-temperature combination as a distinct group. However, this structure does not share information across conditions and is prone to overfitting, especially with limited replication.
-In contrast, the additive model explained substantial variance, particularly for temperature, and identified the largest number of significantly differentially expressed transcripts. This is supported by the MDS plot, which shows that samples primarily cluster by temperature, with less separation by origin — reinforcing the additive model’s ability to capture the dominant biological signal.
-LRT comparing the interaction model to the additive model revealed that only 741 transcripts (~0.4%) showed significantly improved fit when including the interaction term. These transcripts were considered candidates for origin-dependent temperature responses and were extracted for downstream analysis. Based on these results, the additive model was selected for global differential expression analysis.
+This script compares condition, additive, and interaction models using variance partitioning and LRTs to evaluate differential expression patterns in *Symphodus melops*. 
+The likelihood ratio test comparing the additive model with and without length identified 6,900 genes where body size explained significant variation. Because body size serves as a proxy for developmental stage, we included length as a covariate in all subsequent models. This ensures that observed effects reflect biological factors of interest rather than developmental differences.
+The condition model explained the highest proportion of variance, reflecting its flexibility in treating each origin-temperature combination as a distinct group. However, this structure does not share information across conditions and is prone to overfitting, especially with limited replication.
+In contrast, the additive model explained substantial variance, particularly for temperature, and identified the largest number of significantly differentially expressed genes. This is supported by the MDS plot, which shows that samples primarily cluster by temperature, with less separation by origin — reinforcing the additive model’s ability to capture the dominant biological signal.
+LRT comparing the interaction model to the additive model revealed that only 977 genes (~0.6%) showed significantly improved fit when including the interaction term. These genes were considered candidates for origin-dependent temperature responses and were extracted for downstream analysis. Based on these results, the additive model was selected for global differential expression analysis.
+
 
 # Session Info
 ```{r session_info} 
 sessionInfo()
 ```
+
+
+
+
+
+
+
