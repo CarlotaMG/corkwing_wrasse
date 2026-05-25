@@ -11,6 +11,7 @@ It includes:
 
 - Guided de novo transcriptome assembly using Trinity
 - Transcript annotation using Trinotate and genome-based GFF integration
+- Comparison of annotation sources
 - PCA and clustering to visualize sample structure
 - Model comparison to evaluate differential expression patterns and select models for transcript extraction across tiers.
 - Differential expression analysis across temperature and origin contrasts using DESeq2
@@ -47,16 +48,11 @@ This chapter is currently under development.
 
 ## Documentation
 
-Rendered HTML reports are available in the `docs/` folder and via GitHub Pages:
+Rendered HTML reports are available in the `docs/` directory and published via GitHub Pages:
 
 🔗 https://carlotamg.github.io/corkwing_wrasse/
 
----
 
-- **DE Model Comparison** - Compares condition, additive, and interaction models. *(Generated from `scripts/DE_model_comparison.Rmd`)*
-- **Additive Model DE** - Performs differential expression analyses using the additive model. *(Generated from `scripts/additive_DE.Rmd`)*
-
-=======
 ## Repository Structure
 
 corkwing_wrasse/
