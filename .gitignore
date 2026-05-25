@@ -1,4 +1,4 @@
-# # Ignore raw data and results folders in chapter directories
+# Ignore raw data and results folders in chapter directories
 chapter1_rnaseq/data/
 chapter1_rnaseq/resources/
 chapter1_rnaseq/results/
@@ -7,6 +7,10 @@ chapter2_wgs/data/
 chapter2_wgs/results/
 chapter2_wgs/jobs/
 chapter2_wg/resources/
+
+# Ignore FastQC report fron /docs
+docs/chapter1_rnaseq/qc_reports/fastqc_raw/
+docs/chapter1_rnaseq/qc_reports/fastqc_trimmed/
 
 # Ignore everything in resources/
 chapter1_rnaseq/resources/*
