@@ -1,6 +1,6 @@
 # Corkwing Wrasse RNA-seq Analysis
 
-This repository contains scripts and results for RNA-seq analysis of *Symphodus melops* (corkwing wrasse) from southern and western Norwegian populations and their hybrids. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses, local adaptation, hybrid inheritance and misexpression.
+This repository contains scripts and results for RNA-seq analysis of *Symphodus melops* (corkwing wrasse) from southern and western Norwegian populations and their hybrids. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses to temperature, population divergence, hybrid inheritance and misexpression.
 
 Rendered HTML reports from sample quality control and RMarkdown analyses are hosted via GitHub Pages at [carlotamg.github.io/corkwing_wrasse](https://carlotamg.github.io/corkwing_wrasse).
 
@@ -90,6 +90,32 @@ SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were int
 All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
 
 Details of container setup, module usage, external data resources and R sessions are documented in each section README. 
+
+---
+
+## Project Structure
+
+The repository is organized into modular components corresponding to each analysis step:
+
+chapter1_rnaseq/
+│
+├── data/                     # Input data (metadata, raw and intermediate files)
+│
+├── resources/                # Reference genome, adapters, and external resources
+│
+├── results/                  # Outputs generated across analysis stages
+│   ├── assembly/             # Transcriptome assembly and quantification outputs
+│   ├── annotation/           # Functional annotation outputs (Trinotate, EggNOG, etc.)
+│   ├── DE/                   # Differential expression results (tiers, tables and visualizations)
+│   ├── sample_clustering/    # PCA and clustering results (plots and distance metrics)
+│   └── functional_enrichment/ # Functional enrichment results across tiers
+│
+├── scripts/                  # Modular analysis workflows
+│   ├── assembly/             # Transcriptome assembly
+│   ├── annotation/           # Functional annotation (Trinotate, EggNOG, etc.)
+│   ├── DE/                   # Differential expression analysis
+│   ├── sample_clustering/    # PCA analysis
+│   └── functional_enrichment/ # Functional enrichment 
 
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 
