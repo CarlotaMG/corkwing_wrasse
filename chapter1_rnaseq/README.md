@@ -12,22 +12,26 @@ To interpret temperature-dependent gene expression, we defined candidate sets ac
 
 - **Tier 1: Shared temperature-responsive genes** 
   Genes consistently regulated by temperature across all origins. Defined by intersecting results from all pairwise temperature contrasts of the additive DE model. 
-  *Biological rationale*: given their consistent regulation across populations, these genes are expected to represent conserved components of the temperature response.
+ 
+	*Biological rationale*: given their consistent regulation across populations, these genes are expected to represent conserved components of the temperature response.
 
 - **Tier 2: Divergence between West and South origins** 
   Constitutive differences between origins using the additive DE model 
-  *Biological rationale*: represents baseline expression differences that may reflect fixed genetic divergence.
+  	
+	*Biological rationale*: represents baseline expression differences that may reflect fixed genetic divergence.
 
 - **Tier 2b: Local thermal adaptation candidates**
   Overlap between Tier 2 constitutive differences and genes with significant interaction effects.
-  *Biological rationale*: strongest candidates for local adaptation, combining constitutive divergence with origin-specific plasticity.
+ 
+	*Biological rationale*: strongest candidates for local adaptation, combining constitutive divergence with origin-specific plasticity.
 
 - **Tier 3: Hybrid inheritance and misexpression**
   Defined using the condition DE model at the isoform level. Categories include:
   - Misexpression (within-range and transgressive)
   - South-like inheritance
   - West-like inheritance
-  *Biological rationale*: provides insight into how parental expression programs are maintained or disrupted in hybrids, highlighting regulatory incompatibilities.
+ 
+	*Biological rationale*: provides insight into how parental expression programs are maintained or disrupted in hybrids, highlighting regulatory incompatibilities.
 
 ---
 
@@ -53,7 +57,7 @@ This chapter includes:
 
 4. **[Annotation](scripts/annotation/README.md)**
 
-5. **[Functional Enrichment README](scripts/functional_enrichment/README.md)**
+5. **[Functional Enrichment](scripts/functional_enrichment/README.md)**
 
 ---
 
