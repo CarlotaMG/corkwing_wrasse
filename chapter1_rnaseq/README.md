@@ -18,7 +18,8 @@ To interpret temperature-dependent gene expression, we defined candidate sets ac
 - **Tier 2: Divergence between West and South origins** 
   Constitutive differences between origins using the additive DE model 
   	
-	*Biological rationale*: represents baseline expression differences that may reflect fixed genetic divergence.
+	*Biological rationale*: represents baseline expression differences between populations, potentially reflecting underlying regulatory divergence.
+
 
 - **Tier 2b: Local thermal adaptation candidates**
   Overlap between Tier 2 constitutive differences and genes with significant interaction effects.
@@ -75,6 +76,8 @@ This design reflects the actual workflow used during analysis and supports repro
 - **R-based analyses**: All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
 
 Details of container setup, module usage, external data resources and R sessions are documented in each section README. 
+
+All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 
 ---
 
