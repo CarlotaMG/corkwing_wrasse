@@ -70,10 +70,24 @@ Most scripts in this repository are modular and can be executed locally or on Un
 
 This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
 
-- **Containers**: Trinity(assembly) and Trinotate(annotation) were run inside Singularity/Apptainer containers for reproducibility.  
-- **Modules**: FastQC, MultiQC, STAR, SAMtools, BUSCO, HMMER, BLAST+, InterProScan, and others were loaded as environment modules.  
-- **Special tools**: SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were integrated into annotation workflows.
-- **R-based analyses**: All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
+#### Containers
+Trinity(assembly) and Trinotate(annotation) were run inside Singularity/Apptainer containers for reproducibility. 
+#### HPC Modules
+The following environment modules were loaded on Saga (Sigma2 cluster):
+- FastQC/0.12.1-Java-11
+- MultiQC/1.22.3-foss-2023b
+- Trimmomatic/0.39-Java-11
+- STAR/2.7.10b-GCC-11.3.0
+- SAMtools/1.16.1-GCC-11.3.0
+- BUSCO/5.5.0-foss-2022b
+- HMMER/3.4-gompi-2023a
+- BLAST+/2.14.1-gompi-2023a
+- Python/3.10.8-GCCcore-12.2.0
+- InterProScan/5.62-94.0-foss-2022a
+#### Special tools
+SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were integrated into annotation workflows.
+#### R-based analyses
+All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
 
 Details of container setup, module usage, external data resources and R sessions are documented in each section README. 
 
