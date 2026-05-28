@@ -1,11 +1,12 @@
 ---
 title: "Comparison and Integration of Annotation Sources"
-author: "Carlota Gouveia"
+author: "Carlota Myhre de Gouveia"
 date: "2026-04-24"
 output:
   html_document:
     toc: true
     toc_float: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -18,20 +19,36 @@ knitr::opts_knit$set(
 
 This report summarises, compares, and integrates the different annotation sources available for the *Symphodus melops* transcriptome, including EggNOG, InterProScan, Trinotate, and genome-based annotations.
 
+
+# Analysis
+
 ## Load necessary packages
 ```{r packages}
 suppressPackageStartupMessages({
   library(tidyverse)
-  library(dplyr)
-  library(ggplot2)
   library(UpSetR)
-  library(readr)
-  library(stringr)
+  library(knitr)
+  library(DT)
+	library(here)
 })
 ```
 
+```{r force_dplyr, include=FALSE}
+# Force dplyr versions of key functions
+select    <- dplyr::select
+filter    <- dplyr::filter
+mutate    <- dplyr::mutate
+distinct  <- dplyr::distinct
+rename    <- dplyr::rename
+summarise <- dplyr::summarise
+group_by  <- dplyr::group_by
+left_join <- dplyr::left_join
+arrange   <- dplyr::arrange
+```
+
+
 ## Load and Inspect Annotation Sources
-```{r}
+```{r Load_annotation_sources}
 
 ## EggNOG annotation
 # Read file as raw text
@@ -99,34 +116,23 @@ genome_based <- read_tsv(
   "results/annotation/genome_based/trinities_filteringby_cov_summary.tsv"
 )
 
-# ---- Quick row-count inspection ----
+# ---- Row counts table ----
+row_counts <- data.frame(
+  Source = c("EggNOG", "IPS", "Trinotate", "SignalP", "TMHMM", "Genome-based"),
+  Rows   = c(nrow(eggnog), nrow(ips), nrow(trinotate_report),
+             nrow(signalp), nrow(tmhmm), nrow(genome_based))
+)
 
-cat("EggNOG rows:", nrow(eggnog), "\n")
-cat("IPS rows:", nrow(ips), "\n")
-cat("Trinotate rows:", nrow(trinotate_report), "\n")
-cat("SignalP rows:", nrow(signalp), "\n")
-cat("TMHMM GFF3 rows:", nrow(tmhmm), "\n")
-cat("Genome-based rows:", nrow(genome_based), "\n")
+kable(row_counts, caption = "Row counts per annotation source")
 
-# ---- Compact structure preview ----
+# ---- Compact previews as tables ----
+kable(head(eggnog, 5), caption = "EggNOG preview (first 5 rows)")
+kable(head(ips, 5), caption = "InterProScan preview (first 5 rows)")
+kable(head(trinotate_report, 5), caption = "Trinotate preview (first 5 rows)")
+kable(head(signalp, 5), caption = "SignalP preview (first 5 rows)")
+kable(head(tmhmm, 5), caption = "TMHMM preview (first 5 rows)")
+kable(head(genome_based, 5), caption = "Genome-based annotation preview (first 5 rows)")
 
-cat("\nEggNOG (head):\n")
-head(eggnog)
-
-cat("\nIPS (head):\n")
-head(ips)
-
-cat("\nTrinotate report (head):\n")
-head(trinotate_report)
-
-cat("\nSignalP (head):\n")
-head(signalp)
-
-cat("\nTMHMM GFF3 (head):\n")
-head(tmhmm)
-
-cat("\nGenome-based annotation (head):\n")
-head(genome_based)
 ```
 
 ## Standardize Trinity IDs across annotation sources
@@ -193,11 +199,11 @@ genome_based <- genome_based %>%
 ```
 
 ## Integrate SignalP-6.0 into Trinotate report
-```{r}
-# Identify transcripts with a signal peptide (YES)
+```{r integrate_signalp}
+# Identify transcripts with a signal peptide 
 signalp_hits <- signalp %>%
   filter(type == "signal_peptide") %>%
-  distinct(transcript_id) %>%      # <-- ONLY transcript_id
+  distinct(transcript_id) %>%      
   mutate(SignalP = "YES")
 
 # Remove old Trinotate SignalP column
@@ -205,21 +211,21 @@ trinotate_report <- trinotate_report %>% select(-SignalP)
 
 # Build full transcript list from Trinotate
 all_transcripts <- trinotate_report %>%
-  select(transcript_id) %>%        # <-- ONLY transcript_id
+  select(transcript_id) %>%        
   distinct()
 
 # Create complete YES/NO table (join ONLY on transcript_id)
 signalp_full <- all_transcripts %>%
-  left_join(signalp_hits, by = "transcript_id") %>%   # <-- ONLY transcript_id
+  left_join(signalp_hits, by = "transcript_id") %>%   
   mutate(SignalP = ifelse(is.na(SignalP), "NO", SignalP))
 
 # Merge into Trinotate report
 trinotate_report <- trinotate_report %>%
-  left_join(signalp_full, by = "transcript_id")       # <-- ONLY transcript_id
+  left_join(signalp_full, by = "transcript_id")       
 ```
 
 ## Integrate DeepTmhmm into Trinotate report
-```{r}
+```{r integrate_deeptmhmm}
 # ---- Identify transcripts with ≥1 TM helix ----
 tmhmm_hits <- tmhmm %>%
   filter(type == "TMhelix") %>%
@@ -241,12 +247,11 @@ trinotate_report <- trinotate_report %>%
   left_join(tmhmm_full, by = "transcript_id")
 ```
 
-```{r}
-colnames(eggnog)
-```
 
-## EggNog extraction function
-```{r}
+## Extraction of relevant annotation fields from each source
+
+### EggNog extraction function
+```{r eggnog_extract_function}
 extract_eggnog_annotations <- function(gene_list, eggnog) {
   
   clean_field <- function(x) {
@@ -276,8 +281,8 @@ extract_eggnog_annotations <- function(gene_list, eggnog) {
 }
 ```
 
-## IPS extraction function
-```{r}
+### IPS extraction function
+```{r ips_extract_function}
 extract_ips_annotations <- function(gene_list, ips) {
   
   clean_field <- function(x) {
@@ -306,8 +311,8 @@ extract_ips_annotations <- function(gene_list, ips) {
 }
 ```
 
-## Trinotate Extraction Function
-```{r}
+### Trinotate Extraction Function
+```{r trinotate_extraction_function}
 extract_trinotate_annotations <- function(gene_list, trinotate_report) {
   
   clean_field <- function(x) {
@@ -362,8 +367,8 @@ extract_trinotate_annotations <- function(gene_list, trinotate_report) {
 ```
 
 
-## Genome based annotation extraction function
-```{r}
+### Genome based annotation extraction function
+```{r genome_based_extraction_function}
 extract_genome_annotations <- function(gene_list, genome_based) {
   
   genome_based %>%
@@ -384,8 +389,8 @@ extract_genome_annotations <- function(gene_list, genome_based) {
 }
 ```
 
-## Function to integrate all annotatiosn sources in one single table for a set of genes
-```{r}
+## Function to integrate all annotation sources in one single table for a set of genes
+```{r integrate_all_function}
 integrate_annotations <- function(gene_list,
                                   eggnog,
                                   ips,
@@ -410,50 +415,6 @@ integrate_annotations <- function(gene_list,
 }
 ```
 
-## Annotation classification function
-```{r}
-classify_annotations <- function(integrated_table) {
-  
-  coverage_threshold_strong <- 70
-  coverage_threshold_moderate <- 40
-  
-  integrated_table %>%
-    mutate(
-      # Strong evidence flags
-      has_eggnog   = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
-      has_ips      = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
-      has_blast    = if_any(c("trinotate_BLASTX","trinotate_BLASTP",
-                              "trinotate_PFAM","trinotate_GO"),
-                            ~ !is.na(.) & . != ""),
-      genome_func  = if_any(c("genome_GO","genome_UniProt","genome_Dbxref"),
-                            ~ !is.na(.) & . != ""),
-      
-      # Genome coverage categories
-      genome_strong   = genome_func & genome_coverage >= coverage_threshold_strong,
-      genome_moderate = genome_func & genome_coverage >= coverage_threshold_moderate & genome_coverage < coverage_threshold_strong,
-      genome_weak     = genome_func & genome_coverage < coverage_threshold_moderate,
-      genome_mapped_only = genome_coverage >= coverage_threshold_strong & !genome_func,
-      
-      # Weak evidence flags
-      has_signalp  = trinotate_SignalP == "YES",
-      has_tmhmm    = trinotate_TMHMM == "YES",
-      genome_low   = genome_coverage < coverage_threshold_strong & !genome_func,
-      
-      # Count strong sources (EggNOG, IPS, BLAST, genome strong)
-      strong_sources = (has_eggnog + has_ips + has_blast + genome_strong),
-      
-      # Classification
-      annotation_class = case_when(
-        strong_sources >= 2 ~ "Well-annotated",
-        strong_sources == 1 | genome_moderate ~ "Partially annotated",
-        genome_mapped_only ~ "Mapped only",
-        genome_weak | has_signalp | has_tmhmm | genome_low ~ "Weakly annotated",
-        TRUE ~ "Unannotated"
-      )
-    )
-}
-```
-
 ##  Create master table
 ```{r}
 # Use Trinotate IDs as master list
@@ -468,83 +429,25 @@ integrated_table <- integrate_annotations(
   genome_based
 )
 
+
+# ---- Dimensions summary ----
+summary_info <- data.frame(
+  Genes = nrow(integrated_table),
+  Annotation_fields = ncol(integrated_table)
+)
+
+kable(summary_info,
+      caption = "Integrated table dimensions (rows = genes, columns = annotation fields)")
+
+# ---- Preview of integrated table ----
+kable(
+  head(integrated_table, 10),
+  caption = "Integrated annotation table (first 10 genes)"
+)
 ```
 
---------
 
-```{r}
-# Show all column names in your integrated table
-colnames(integrated_table)
-
-# Or, if you want a quick overview of the structure:
-str(integrated_table)
-
-# If you’re using dplyr/tidyverse, glimpse is handy:
-glimpse(integrated_table)
-```
-```{r}
-# Look at a random sample of BLASTX hits
-integrated_table %>%
-  select(gene_id, trinotate_BLASTX) %>%
-  filter(!is.na(trinotate_BLASTX)) %>%
-  sample_n(10)
-
-# Same for BLASTP
-integrated_table %>%
-  select(gene_id, trinotate_BLASTP) %>%
-  filter(!is.na(trinotate_BLASTP)) %>%
-  sample_n(10)
-
-# Look at a random sample of genome_Dbxref entries
-integrated_table %>%
-  select(gene_id, genome_Dbxref) %>%
-  filter(!is.na(genome_Dbxref)) %>%
-  sample_n(10)
-
-
-```
-
-```{r}
-library(dplyr)
-library(stringr)
-
-# Function to check BLAST hit quality across multiple hits in a string
-check_blast_hit <- function(hit_string, min_identity = 30, max_evalue = 1e-5) {
-  if (is.na(hit_string)) return(FALSE)
-  
-  # Split into individual hits (semicolon-delimited)
-  hits <- unlist(strsplit(hit_string, ";"))
-  
-  for (h in hits) {
-    perc_identity <- str_extract(h, "\\d+\\.?\\d*%ID")
-    evalue <- str_extract(h, "E:[^\\^]+")
-    
-    perc_identity <- as.numeric(str_remove(perc_identity, "%ID"))
-    evalue <- as.numeric(str_remove(evalue, "E:"))
-    
-    good_identity <- !is.na(perc_identity) && perc_identity >= min_identity
-    good_evalue   <- !is.na(evalue) && evalue <= max_evalue
-    not_hypo      <- !grepl("hypothetical|uncharacterized", h, ignore.case = TRUE)
-    
-    if (good_identity && good_evalue && not_hypo) {
-      return(TRUE)
-    }
-  }
-  return(FALSE)
-}
-
-# Apply to BLASTX and BLASTP fields
-blast_test <- integrated_table %>%
-  mutate(
-    blastx_strong = sapply(trinotate_BLASTX, check_blast_hit),
-    blastp_strong = sapply(trinotate_BLASTP, check_blast_hit)
-  ) %>%
-  select(gene_id, trinotate_BLASTX, blastx_strong, trinotate_BLASTP, blastp_strong)
-
-# Inspect first 20 results
-head(blast_test, 20)
-```
-## Possible Classification function
+## Annotation classification function
 ```{r}
 # Function to check BLAST hit quality across multiple hits in a string
 check_blast_hit <- function(hit_string, min_identity = 30, max_evalue = 1e-5) {
@@ -650,12 +553,6 @@ classify_annotations <- function(integrated_table) {
 }
 ```
 
-```{r}
-colnames(integrated_table)
-nrow(integrated_table)
-```
-
-
 ## Classify and summarise all annotations
 ```{r}
 # Classify
@@ -672,39 +569,51 @@ write_csv(classified_genes,
 
 ```
 
-## Genome-based Annotation Summary
-```{r}
-# --- Load GFF ---
-gff <- read_tsv("resources/genome_based_annotations/fSymMel2.gff.gz",
-                comment = "##", col_names = FALSE)
 
-colnames(gff) <- c("seqid","source","type","start","end",
-                   "score","strand","phase","attributes")
+## Genome-based Annotation Summary
+
+### Genome annotation overview and transcriptome–genome overlap
+```{r genome_based_annotation_summary_calc, echo=FALSE}
+# --- Load GFF ---
+gff <- read_tsv(
+  "resources/genome_based_annotations/fSymMel2.gff.gz",
+  comment = "##",
+  col_names = FALSE,
+  show_col_types = FALSE
+)
+
+colnames(gff) <- c(
+  "seqid","source","type","start","end",
+  "score","strand","phase","attributes"
+)
 
 # --- Genome totals ---
-genes <- gff %>% filter(type == "gene") %>%
-  mutate(gene_id = str_extract(attributes, "ID=[^;]+"),
-         gene_id = str_remove(gene_id, "^ID="))
+genes <- gff %>%
+  filter(type == "gene") %>%
+  mutate(
+    gene_id = str_extract(attributes, "ID=[^;]+"),
+    gene_id = str_remove(gene_id, "^ID=")
+  )
 
 genome_total <- n_distinct(genes$gene_id)
 
 # --- mRNA features ---
-mrna <- gff %>% filter(type == "mRNA") %>%
-  mutate(gene_id = str_extract(attributes, "Parent=[^;]+"),
-         gene_id = str_remove(gene_id, "^Parent=")) %>%
+mrna <- gff %>%
+  filter(type == "mRNA") %>%
+  mutate(
+    gene_id = str_extract(attributes, "Parent=[^;]+"),
+    gene_id = str_remove(gene_id, "^Parent=")
+  ) %>%
   mutate(
     has_GO       = str_detect(attributes, "Ontology_term="),
     has_UniProt  = str_detect(attributes, "uniprot_id="),
     has_Dbxref   = str_detect(attributes, "InterPro|Pfam|Dbxref="),
     product_hypo = str_detect(attributes, "product=hypothetical protein"),
-
-    # Adjusted definitions
-    curated_function   = has_UniProt,                          # curated = UniProt
-    annotated_function = has_GO | has_Dbxref | (!product_hypo),# GO + domain/db evidence
+    curated_function   = has_UniProt,
+    annotated_function = has_GO | has_Dbxref | (!product_hypo),
     unannotated        = product_hypo & !has_UniProt & !has_GO & !has_Dbxref
   )
 
-# Collapse mRNA to unique gene-level flags
 mrna_flags <- mrna %>%
   group_by(gene_id) %>%
   summarise(
@@ -714,28 +623,17 @@ mrna_flags <- mrna %>%
     .groups = "drop"
   )
 
-# --- Genome-level summary ---
-genome_curated_total <- sum(mrna_flags$curated_function)
-genome_annotated_total <- sum(mrna_flags$annotated_function)
+genome_curated_total     <- sum(mrna_flags$curated_function)
+genome_annotated_total   <- sum(mrna_flags$annotated_function)
 genome_unannotated_total <- sum(mrna_flags$unannotated)
 
-cat("Genome annotation (GFF) total genes:", genome_total, "\n")
-cat("Curated (UniProt):", genome_curated_total,
-    "(", round(genome_curated_total/genome_total*100), "%)\n")
-cat("Annotated (GO/InterPro/Pfam/etc.):", genome_annotated_total,
-    "(", round(genome_annotated_total/genome_total*100), "%)\n")
-cat("Unannotated:", genome_unannotated_total,
-    "(", round(genome_unannotated_total/genome_total*100), "%)\n\n")
-
 # --- Transcriptome–genome intersection ---
-genome_based_flagged <- genome_based %>%
+genome_based_unique <- genome_based %>%
   filter(!is.na(Gene_ID)) %>%
-  left_join(mrna_flags, by = c("Gene_ID" = "gene_id"))
-
-genome_based_unique <- genome_based_flagged %>%
+  left_join(mrna_flags, by = c("Gene_ID" = "gene_id")) %>%
   group_by(Gene_ID) %>%
   summarise(
-    Coverage = max(`Coverage_%`),
+    Coverage = max(`Coverage_%`, na.rm = TRUE),
     curated_function   = any(curated_function, na.rm = TRUE),
     annotated_function = any(annotated_function, na.rm = TRUE),
     unannotated        = any(unannotated, na.rm = TRUE),
@@ -744,90 +642,135 @@ genome_based_unique <- genome_based_flagged %>%
   mutate(
     cov_class = case_when(
       Coverage < 40 ~ "<40%",
-      Coverage >= 40 & Coverage < 70 ~ "40-70%",
-      Coverage >= 70 ~ ">=70%"
+      Coverage >= 40 & Coverage < 70 ~ "40–70%",
+      Coverage >= 70 ~ "≥70%"
     )
   )
 
 coverage_summary <- genome_based_unique %>%
   group_by(cov_class) %>%
   summarise(
-    total_genes       = n(),
-    curated           = sum(curated_function),
-    annotated         = sum(annotated_function),
-    unannotated       = sum(unannotated),
+    total_genes = n(),
+    curated     = sum(curated_function),
+    annotated   = sum(annotated_function),
+    unannotated = sum(unannotated),
     .groups = "drop"
   )
 
-coverage_totals <- coverage_summary %>%
-  summarise(
-    cov_class = "Total",
-    total_genes = sum(total_genes),
-    curated     = sum(curated),
-    annotated   = sum(annotated),
-    unannotated = sum(unannotated)
-  )
+intersection_total <- sum(coverage_summary$total_genes)
+```
 
-coverage_summary <- bind_rows(coverage_summary, coverage_totals) %>%
-  mutate(cov_class = factor(cov_class,
-                            levels = c("<40%", "40-70%", ">=70%", "Total"))) %>%
-  arrange(cov_class)
+### Transcriptome–genome intersection statistics
+```{r genome_intersection_stats, echo=FALSE}
 
-print(coverage_summary)
+# Recreate coverage_table (needed for calculations)
+coverage_table <- bind_rows(
+  coverage_summary,
+  coverage_summary %>%
+    summarise(
+      cov_class   = "Total",
+      total_genes = sum(total_genes),
+      curated     = sum(curated),
+      annotated   = sum(annotated),
+      unannotated = sum(unannotated),
+      .groups = "drop"
+    )
+)
 
-# --- Intersection reporting ---
-intersection_total <- coverage_summary$total_genes[coverage_summary$cov_class=="Total"]
-mod_high <- coverage_summary %>% filter(cov_class %in% c("40-70%", ">=70%"))
-mod_high_total <- sum(mod_high$total_genes)
-mod_high_curated <- sum(mod_high$curated)
-mod_high_annotated <- sum(mod_high$annotated)
+# Total intersecting genes
+intersection_total <- coverage_table$total_genes[coverage_table$cov_class == "Total"]
+
+# Coverage classes
+low_cov  <- coverage_table$total_genes[coverage_table$cov_class == "<40%"]
+mod_cov  <- coverage_table$total_genes[coverage_table$cov_class == "40–70%"]
+high_cov <- coverage_table$total_genes[coverage_table$cov_class == "≥70%"]
+
+# Annotation totals within the intersection
+total_curated     <- coverage_table$curated[coverage_table$cov_class == "Total"]
+total_annotated   <- coverage_table$annotated[coverage_table$cov_class == "Total"]
+total_unannotated <- coverage_table$unannotated[coverage_table$cov_class == "Total"]
+
+# Moderate + high coverage subset
+mod_high <- coverage_table %>%
+  filter(cov_class %in% c("40–70%", "≥70%"))
+
+mod_high_total       <- sum(mod_high$total_genes)
+mod_high_curated     <- sum(mod_high$curated)
+mod_high_annotated   <- sum(mod_high$annotated)
 mod_high_unannotated <- sum(mod_high$unannotated)
 
-cat("\nTranscriptome–genome intersection total genes:", intersection_total, "\n")
-cat("Low coverage (<40%):", coverage_summary$total_genes[coverage_summary$cov_class=="<40%"],
-    "genes (", round(coverage_summary$total_genes[coverage_summary$cov_class=="<40%"]/intersection_total*100), "%)\n")
-cat("Moderate coverage (40–70%):", coverage_summary$total_genes[coverage_summary$cov_class=="40-70%"],
-    "genes (", round(coverage_summary$total_genes[coverage_summary$cov_class=="40-70%"]/intersection_total*100), "%)\n")
-cat("High coverage (≥70%):", coverage_summary$total_genes[coverage_summary$cov_class==">=70%"],
-    "genes (", round(coverage_summary$total_genes[coverage_summary$cov_class==">=70%"]/intersection_total*100), "%)\n")
-cat("Curated (UniProt):", coverage_summary$curated[coverage_summary$cov_class=="Total"],
-    "(", round(coverage_summary$curated[coverage_summary$cov_class=="Total"]/intersection_total*100), "%)\n")
-cat("Annotated (GO/InterPro/Pfam/etc.):",
-    coverage_summary$annotated[coverage_summary$cov_class=="Total"],
-    "(", round(coverage_summary$annotated[coverage_summary$cov_class=="Total"]/intersection_total*100), "%)\n")
-cat("Unannotated:",
-    coverage_summary$unannotated[coverage_summary$cov_class=="Total"],
-    "(", round(coverage_summary$unannotated[coverage_summary$cov_class=="Total"]/intersection_total*100), "%)\n")
-cat("Moderate to high coverage (≥40%):", mod_high_total, "genes (",
-    round(mod_high_total/intersection_total*100), "%), of which",
-    mod_high_curated, "are curated (",
-    round(mod_high_curated/mod_high_total*100), "%),",
-    mod_high_annotated, "are annotated (",
-    round(mod_high_annotated/mod_high_total*100), "%), and",
-    mod_high_unannotated, "remain unannotated (",
-    round(mod_high_unannotated/mod_high_total*100, 1), "%)\n")
+# Genome vs intersection curated comparison
+genome_curated_absent        <- genome_curated_total - total_curated
+genome_curated_retained_pct  <- round(total_curated / genome_curated_total * 100)
+genome_curated_absent_pct    <- round(genome_curated_absent / genome_curated_total * 100)
+
 ```
-Of the 19,172 curated genes annotated in the genome, 18,641 (97%) were retained in the transcriptome–genome intersection, while 531 (3%) curated genes were absent. These missing curated genes likely represent loci not expressed in the sampled transcriptome or annotation artifacts from genome gene models. Thus, while the intersection enriches for annotations, it also excludes a subset of genome‑annotated genes.
 
------------
+### Genome annotation (GFF)
 
-## Genome‑level and Trinity gene‑level flags
+- **Total genes:** `r genome_total`
+- **Curated (UniProt):** `r genome_curated_total`
+  (`r round(genome_curated_total / genome_total * 100)`%)
+- **Annotated (GO/InterPro/Pfam/etc.):** `r genome_annotated_total`
+  (`r round(genome_annotated_total / genome_total * 100)`%)
+- **Unannotated:** `r genome_unannotated_total`
+  (`r round(genome_unannotated_total / genome_total * 100)`%)
+
+
+```{r genome_coverage_table, echo=FALSE}
+
+knitr::kable(
+  coverage_table,
+  caption = "Genome–transcriptome coverage categories and annotation status",
+  col.names = c(
+    "Coverage class",
+    "Total genes",
+    "Curated",
+    "Annotated",
+    "Unannotated"
+  )
+)
+```
+
+### Transcriptome–genome intersection summary
+
+- **Transcriptome–genome intersection total genes:** `r intersection_total`
+- **Low coverage (<40%):** `r low_cov` genes (`r round(low_cov / intersection_total * 100)`%)
+- **Moderate coverage (40–70%):** `r mod_cov` genes (`r round(mod_cov / intersection_total * 100)`%)
+- **High coverage (≥70%):** `r high_cov` genes (`r round(high_cov / intersection_total * 100)`%)
+
+- **Curated (UniProt):** `r total_curated` (`r round(total_curated / intersection_total * 100)`%)
+- **Annotated (GO/InterPro/Pfam/etc.):** `r total_annotated` (`r round(total_annotated / intersection_total * 100)`%)
+- **Unannotated:** `r total_unannotated` (`r round(total_unannotated / intersection_total * 100)`%)
+
+- **Moderate to high coverage (≥40%):** **`r mod_high_total`** genes  
+  (`r round(mod_high_total / intersection_total * 100)`%), of which  
+  **`r mod_high_curated`** are curated (`r round(mod_high_curated / mod_high_total * 100)`%),  
+  **`r mod_high_annotated`** are annotated (`r round(mod_high_annotated / mod_high_total * 100)`%), and  
+  **`r mod_high_unannotated`** remain unannotated (`r round(mod_high_unannotated / mod_high_total * 100, 1)`%).
+
+Of the **`r genome_curated_total` curated genes annotated in the genome**,  **`r total_curated` (`r genome_curated_retained_pct`%)** were retained in the transcriptome–genome intersection, while  **`r genome_curated_absent` (`r genome_curated_absent_pct`%)** curated genes were absent. These missing curated genes likely represent loci not expressed in the sampled transcriptome or annotation artifacts from genome gene models. Thus, while the intersection enriches for annotations, it also excludes a subset of genome‑annotated genes.
+
+
+## Annotation Source Intersections and Coverage
+
+### Genome‑level and Trinity gene‑level flags
 ```{r}
-# Genome-level flags (unique genome_gene_id)
+# Genome-level flag (unique genome_gene_id)
 genome_flags <- integrated_table %>%
   filter(!is.na(genome_gene_id)) %>%
   group_by(genome_gene_id) %>%
   summarise(
     has_genome = any(
-      genome_coverage >= 40 &
+      genome_coverage >= 70 &
       ( (!is.na(genome_GO) & genome_GO != "") |
         (!is.na(genome_UniProt) & genome_UniProt != "") )
     ),
     .groups = "drop"
   )
 
-# Trinity gene-level flags
-gene_flags <- integrated_table %>%
+# Transcript-level flags
+overlap_data <- integrated_table %>%
   mutate(
     has_eggnog = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
     has_ips = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
@@ -835,27 +778,38 @@ gene_flags <- integrated_table %>%
                              "trinotate_PFAM","trinotate_GO"),
                            ~ !is.na(.) & . != "")
   ) %>%
-  select(gene_id, genome_gene_id, has_eggnog, has_ips, has_trinotate) %>%
+  select(gene_id, genome_gene_id, has_eggnog, has_ips, has_trinotate)
+
+# Join genome flag back to transcript table
+overlap_data <- overlap_data %>%
   left_join(genome_flags, by = "genome_gene_id") %>%
   mutate(has_genome = replace_na(has_genome, FALSE))
 ```
 
-## UpSet plots and summary counts
-```{r}
-# Trinity gene-level UpSet
-gene_matrix <- gene_flags %>%
+### Transcriptome Gene Annotation Source Intersections
+```{r transcript_level_upset}
+overlap_matrix_transcript <- overlap_data %>%
   mutate(across(-gene_id, ~ as.integer(.))) %>%
   as.data.frame()
-rownames(gene_matrix) <- gene_matrix$gene_id
-gene_matrix <- gene_matrix[,-1]
 
-upset(gene_matrix,
+rownames(overlap_matrix_transcript) <- overlap_matrix_transcript$gene_id
+overlap_matrix_transcript <- overlap_matrix_transcript[,-1]
+
+upset(overlap_matrix_transcript,
       sets = c("has_eggnog","has_ips","has_trinotate","has_genome"),
-      mainbar.y.label = "Trinity gene-level intersections",
-      sets.x.label = "Trinity gene counts")
+      mainbar.y.label = "Transcriptome-level intersections",
+      sets.x.label = "Transcriptome genes")
+```
 
-# Genome-level UpSet
-genome_matrix <- gene_flags %>%
+
+
+
+The overlap analysis reveals several distinct categories of transcriptome genes. The largest group, comprising over 140,000 genes, are mapped by genome annotation with functional evidence (GO or UniProt) but not recovered by EggNOG, InterProScan, or Trinotate.  The second largest group, around 73,000 genes, remain completely unannotated. Such a fraction is typical in de novo transcriptome assemblies and may represent non‑coding RNAs, assembly artifacts, or genuinely novel genes absent from current databases.
+At the other end of the spectrum, approximately 25,000 genes are supported by all annotation sources. This intersection defines the most robust evidence set and provides the highest confidence for downstream biological interpretation. A further 373 genes are annotated by the functional pipelines but lack genome support, underscoring the complementary role of homology and domain searches in recovering genes missed by structural annotation. Smaller subsets, ranging from a few hundred to several thousand, reflect unique contributions of individual pipelines, such as Trinotate‑only annotations or EggNOG/InterProScan overlaps.
+
+### Genome Locus Annotation Source Intersections
+```{r genome_level_upset}
+overlap_data_genome <- overlap_data %>%
   filter(!is.na(genome_gene_id)) %>%
   group_by(genome_gene_id) %>%
   summarise(
@@ -864,32 +818,47 @@ genome_matrix <- gene_flags %>%
     has_trinotate = any(has_trinotate),
     has_genome    = any(has_genome),
     .groups = "drop"
-  ) %>%
+  )
+
+overlap_matrix_genome <- overlap_data_genome %>%
   mutate(across(-genome_gene_id, ~ as.integer(.))) %>%
   as.data.frame()
-rownames(genome_matrix) <- genome_matrix$genome_gene_id
-genome_matrix <- genome_matrix[,-1]
 
-upset(genome_matrix,
+rownames(overlap_matrix_genome) <- overlap_matrix_genome$genome_gene_id
+overlap_matrix_genome <- overlap_matrix_genome[,-1]
+
+upset(overlap_matrix_genome,
       sets = c("has_eggnog","has_ips","has_trinotate","has_genome"),
       mainbar.y.label = "Genome-level intersections",
       sets.x.label = "Unique genome loci")
+```
 
-# Summary counts
-source_counts_gene <- gene_flags %>%
+### Summary counts
+```{r summary_counts}
+# Transcript-level totals
+source_counts_transcript <- overlap_data %>%
   summarise(
     eggnog_total    = sum(has_eggnog),
     ips_total       = sum(has_ips),
     trinotate_total = sum(has_trinotate)
   )
+
+# Genome-level totals (unique loci)
 source_counts_genome <- genome_flags %>%
   summarise(genome_total = sum(has_genome))
 
-summary_counts <- bind_cols(source_counts_gene, source_counts_genome)
-print(summary_counts)
+# Combined summary
+summary_counts <- bind_cols(source_counts_transcript, source_counts_genome)
+kable(
+  summary_counts,
+  caption = "Total number of annotated transcriptome genes per source"
+)
 ```
 
-## Coverage‑stratified summary table
+TransDecoder predicted a total of 257,710 putative coding genes from the Trinity assembly. Of these, approximately 145,000 had high genome coverage (≥70%), and when collapsed to genome loci this subset corresponded to 17,414 unique genome‑annotated genes, representing the high‑confidence intersection between transcriptome assembly and genome annotation. Complementary annotation pipelines contributed tens of thousands of additional gene annotations — 34,918 from EggNOG, 36,946 from InterProScan, and 37,870 from Trinotate. Importantly, 23,150 predicted genes were annotated by all sources, forming a consensus set of robustly supported functional annotations. Still, 70,846 predicted genes remain without functional annotation, which is expected since many ORFs do not correspond to true protein‑coding genes or lack recognizable functional domains.
+In addition, 4,723 genes were consistently annotated by all transcriptome pipelines but lacked genome‑based annotation. This subset may represent novel or lineage‑specific genes, isoforms not captured in the current genome build, or transcripts from poorly resolved genomic regions. Their consistent annotation across multiple pipelines highlights them as a candidate set for further functional exploration, potentially expanding the known gene repertoire beyond current genome annotation.
+
+### Coverage‑stratified summary table
 ```{r}
 ## Coverage‑stratified summary table
 coverage_data <- integrated_table %>%
@@ -932,242 +901,13 @@ final_summary <- coverage_data %>%
   ) %>%
   arrange(coverage_category)
 
-print(final_summary)
+kable(
+  final_summary,
+  caption = "Distribution of genes across coverage categories and annotation sources"
+)
 ```
 We stratified transcriptome genes, assembled with Trinity, according to the maximum coverage achieved by any of their transcripts when aligned to genome‑annotated mRNAs. Most genes were highly covered (≥70%), with 182,826 in this class; 177,192 of them (≈97%) carried at least one functional annotation. Genes with moderate coverage (40–70%) numbered 4,844, of which 4,415 (≈91%) were functionally annotated. The low‑coverage class (<40%) contained 6,888 genes, with 5,601 (≈81%) functionally annotated. The smaller proportion of annotated genes in this group suggests that many of the unannotated ones may represent assembly artifacts. Finally, 63,152 free transcriptome genes had no match to genome‑annotated mRNAs, yet 2,767 (≈4%) still carried functional annotation. These unmatched but annotated genes represent novel content uncovered by the transcriptome assembly, expanding the gene catalog beyond what is captured in the current genome annotation.
 
------------
-
-
-```{r}
-# BED file: transcriptome alignments intersected with genome GFF
-bed_data <- read_tsv("data/intersected_gff_with_transcriptomebam.bed.gz",
-                     col_names = FALSE)
-
-# Inspect first few rows
-head(bed_data)
-
-```
-
-
-
-```{r}
-library(dplyr)
-library(tidyr)
-library(UpSetR)
-
-# Step 1: Genome-level flag (unique genome_gene_id)
-genome_flags <- integrated_table %>%
-  filter(!is.na(genome_gene_id)) %>%
-  group_by(genome_gene_id) %>%
-  summarise(
-    has_genome = any(
-      genome_coverage >= 70 &
-      ( (!is.na(genome_GO) & genome_GO != "") |
-        (!is.na(genome_UniProt) & genome_UniProt != "") )
-    ),
-    .groups = "drop"
-  )
-
-# Step 2: Transcript-level flags
-overlap_data <- integrated_table %>%
-  mutate(
-    has_eggnog = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
-    has_ips = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
-    has_trinotate = if_any(c("trinotate_BLASTX","trinotate_BLASTP",
-                             "trinotate_PFAM","trinotate_GO"),
-                           ~ !is.na(.) & . != "")
-  ) %>%
-  select(gene_id, genome_gene_id, has_eggnog, has_ips, has_trinotate)
-
-# Step 3: Join genome flag back to transcript table
-overlap_data <- overlap_data %>%
-  left_join(genome_flags, by = "genome_gene_id") %>%
-  mutate(has_genome = replace_na(has_genome, FALSE))
-
-# -------------------------------
-# Transcript-level UpSet plot
-# -------------------------------
-overlap_matrix_transcript <- overlap_data %>%
-  mutate(across(-gene_id, ~ as.integer(.))) %>%
-  as.data.frame()
-
-rownames(overlap_matrix_transcript) <- overlap_matrix_transcript$gene_id
-overlap_matrix_transcript <- overlap_matrix_transcript[,-1]
-
-upset(overlap_matrix_transcript,
-      sets = c("has_eggnog","has_ips","has_trinotate","has_genome"),
-      mainbar.y.label = "Transcriptome-level intersections",
-      sets.x.label = "Transcriptome genes")
-
-# -------------------------------
-# Genome-level UpSet plot
-# -------------------------------
-overlap_data_genome <- overlap_data %>%
-  filter(!is.na(genome_gene_id)) %>%
-  group_by(genome_gene_id) %>%
-  summarise(
-    has_eggnog    = any(has_eggnog),
-    has_ips       = any(has_ips),
-    has_trinotate = any(has_trinotate),
-    has_genome    = any(has_genome),
-    .groups = "drop"
-  )
-
-overlap_matrix_genome <- overlap_data_genome %>%
-  mutate(across(-genome_gene_id, ~ as.integer(.))) %>%
-  as.data.frame()
-
-rownames(overlap_matrix_genome) <- overlap_matrix_genome$genome_gene_id
-overlap_matrix_genome <- overlap_matrix_genome[,-1]
-
-upset(overlap_matrix_genome,
-      sets = c("has_eggnog","has_ips","has_trinotate","has_genome"),
-      mainbar.y.label = "Genome-level intersections",
-      sets.x.label = "Unique genome loci")
-
-# -------------------------------
-# Summary counts
-# -------------------------------
-# Transcript-level totals
-source_counts_transcript <- overlap_data %>%
-  summarise(
-    eggnog_total    = sum(has_eggnog),
-    ips_total       = sum(has_ips),
-    trinotate_total = sum(has_trinotate)
-  )
-
-# Genome-level totals (unique loci)
-source_counts_genome <- genome_flags %>%
-  summarise(genome_total = sum(has_genome))
-
-# Combined summary
-summary_counts <- bind_cols(source_counts_transcript, source_counts_genome)
-print(summary_counts)
-```
-
-```{r}
-# Inspect genome loci that failed the has_genome filter
-failed_genome <- genome_flags %>%
-  filter(!has_genome) %>%
-  left_join(
-    integrated_table %>%
-      select(genome_gene_id, genome_coverage, genome_GO, genome_UniProt),
-    by = "genome_gene_id"
-  )
-
-# How many loci failed?
-nrow(failed_genome)
-
-# Look at a few examples
-head(failed_genome, 20)
-
-# How many Trinity genes do NOT have a genome_gene_id?
-unmapped_trinity <- integrated_table %>%
-  filter(is.na(genome_gene_id)) %>%
-  nrow()
-unmapped_trinity
-
-unmapped_genes <- integrated_table %>%
-  filter(is.na(genome_gene_id)) %>%
-  mutate(
-    has_eggnog = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
-    has_ips = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
-    has_trinotate = if_any(c("trinotate_BLASTX","trinotate_BLASTP",
-                             "trinotate_PFAM","trinotate_GO"),
-                           ~ !is.na(.) & . != "")
-  )
-
-# How many unmapped Trinity genes still have annotation?
-summary_unmapped <- unmapped_genes %>%
-  summarise(
-    eggnog_total    = sum(has_eggnog),
-    ips_total       = sum(has_ips),
-    trinotate_total = sum(has_trinotate)
-  )
-
-nrow(unmapped_genes)        # total unmapped Trinity genes
-summary_unmapped            # annotation counts among them
-
-# Inspect unmapped Trinity genes with annotation
-unmapped_with_annotation <- unmapped_genes %>%
-  filter(has_eggnog | has_ips | has_trinotate)
-
-nrow(unmapped_with_annotation)   # should be ~3000
-head(unmapped_with_annotation, 20)
-```
-
-
-
-```{r}
-# Step 1: Define overlap flags (bundled scheme, consistent with classification)
-overlap_data <- integrated_table %>%
-  mutate(
-    has_eggnog = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
-    has_ips = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
-    has_trinotate = if_any(c("trinotate_BLASTX","trinotate_BLASTP",
-                             "trinotate_PFAM","trinotate_GO"),
-                           ~ !is.na(.) & . != ""),
-    # Genome functional fields: only GO or UniProt, with 100% coverage
-    has_genome = (genome_coverage == 100) &
-                 ( (!is.na(genome_GO) & genome_GO != "") |
-                   (!is.na(genome_UniProt) & genome_UniProt != "") )
-  ) %>%
-  select(gene_id, has_eggnog, has_ips, has_trinotate, has_genome)
-
-# Step 2: Convert logicals to numeric (0/1) for UpSetR
-overlap_matrix <- overlap_data %>%
-  mutate(across(-gene_id, ~ as.integer(.))) %>%
-  as.data.frame()
-
-rownames(overlap_matrix) <- overlap_matrix$gene_id
-overlap_matrix <- overlap_matrix[,-1]
-
-# Step 3: Global UpSet plot
-upset(overlap_matrix, sets = c("has_eggnog","has_ips","has_trinotate","has_genome"))
-
-# Step 4: Extract overlap counts (including unannotated explicitly)
-overlap_counts <- overlap_matrix %>%
-  mutate(combo = paste0("E", has_eggnog,
-                        "_I", has_ips,
-                        "_T", has_trinotate,
-                        "_G", has_genome)) %>%
-  count(combo) %>%
-  arrange(desc(n))
-
-# Explicit unannotated count
-unannotated <- sum(overlap_matrix$has_eggnog == 0 &
-                   overlap_matrix$has_ips == 0 &
-                   overlap_matrix$has_trinotate == 0 &
-                   overlap_matrix$has_genome == 0)
-
-overlap_counts <- bind_rows(
-  overlap_counts,
-  data.frame(combo = "E0_I0_T0_G0", n = unannotated)
-)
-
-print(overlap_counts)
-
-# Step 5: Raw totals per source
-source_counts <- overlap_data %>%
-  summarise(
-    eggnog_total    = sum(has_eggnog),
-    ips_total       = sum(has_ips),
-    trinotate_total = sum(has_trinotate),
-    genome_total    = sum(has_genome)
-  )
-
-print(source_counts)
-
-```
-
-```{r}
-
-```
-
-
-The overlap analysis reveals several distinct categories of gene clusters. The largest group, comprising over 139,000 genes, are supported by genome annotation with functional evidence (GO or UniProt) but not recovered by EggNOG, InterProScan, or Trinotate. This highlights the breadth of genome‑based annotation, which often identifies many functionally tagged genes that homology and domain pipelines do not capture. The second largest group, around 73,000 genes, remain completely unannotated. Such a fraction is typical in de novo transcriptome assemblies and may represent non‑coding RNAs, assembly artifacts, or genuinely novel genes absent from current databases.
-At the other end of the spectrum, approximately 16,000 genes are supported by all annotation sources. This intersection defines the most robust evidence set and provides the highest confidence for downstream biological interpretation. A further 13,000 genes are annotated by all functional pipelines but lack genome support, underscoring the complementary role of homology and domain searches in recovering genes missed by structural annotation. Smaller subsets, ranging from a few hundred to several thousand, reflect unique contributions of individual pipelines, such as Trinotate‑only annotations or EggNOG/InterProScan overlaps.
 
 ```{r}
 # Step 1: Define overlap flags (EggNOG, IPS, Trinotate at transcript-level)
@@ -1225,137 +965,9 @@ ggplot(totals, aes(x=Source, y=Count, fill=Source)) +
   theme(legend.position="none")
 ```
 
-```{r}
-# Step 1: Create totals dataframe with corrected Genome count
-totals <- data.frame(
-  Source = c("EggNOG","IPS","Trinotate","Genome","Unannotated"),
-  Count  = c(34918, 36946, 37870, 20645, 70846)  # <-- Genome replaced with 20,645
-)
-
-# Step 2: Barplot
-library(ggplot2)
-
-ggplot(totals, aes(x=Source, y=Count, fill=Source)) +
-  geom_bar(stat="identity") +
-  labs(title="Annotated vs Unannotated Genes",
-       x="Annotation Source",
-       y="Number of Genes") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position="none")
-```
-
-
-```{r}
-# Step 1: Define overlap flags (EggNOG, IPS, Trinotate at transcript-level)
-overlap_data <- integrated_table %>%
-  mutate(
-    has_eggnog = if_any(starts_with("egg"), ~ !is.na(.) & . != ""),
-    has_ips = if_any(starts_with("ips"), ~ !is.na(.) & . != ""),
-    has_trinotate = if_any(c("trinotate_BLASTX","trinotate_BLASTP",
-                             "trinotate_PFAM","trinotate_GO"),
-                           ~ !is.na(.) & . != ""),
-    has_genome = (genome_coverage == 100) &
-                 ( (!is.na(genome_GO) & genome_GO != "") |
-                   (!is.na(genome_UniProt) & genome_UniProt != "") )
-  ) %>%
-  select(gene_id, genome_gene_id, has_eggnog, has_ips, has_trinotate, has_genome)
-
-# Step 2: Collapsed genome totals (unique genome_gene_id)
-genome_total <- overlap_data %>%
-  filter(has_genome) %>%
-  distinct(genome_gene_id) %>%
-  nrow()
-
-# Step 3: Totals for other sources (still transcript-level)
-source_counts <- overlap_data %>%
-  summarise(
-    eggnog_total    = sum(has_eggnog),
-    ips_total       = sum(has_ips),
-    trinotate_total = sum(has_trinotate)
-  )
-
-# Step 4: Explicit unannotated count
-unannotated <- overlap_data %>%
-  filter(!has_eggnog & !has_ips & !has_trinotate & !has_genome) %>%
-  nrow()
-
-# Step 5: Combine into tidy dataframe
-totals <- data.frame(
-  Source = c("EggNOG","IPS","Trinotate","Genome","Unannotated"),
-  Count  = c(source_counts$eggnog_total,
-             source_counts$ips_total,
-             source_counts$trinotate_total,
-             genome_total,
-             unannotated)
-)
-
-print(totals)
-
-# Step 6: Barplot
-ggplot(totals, aes(x=Source, y=Count, fill=Source)) +
-  geom_bar(stat="identity") +
-  labs(title="Annotated vs Unannotated Genes",
-       x="Annotation Source",
-       y="Number of Genes") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position="none")
-```
-```{r}
-classified_genes %>% distinct(genome_gene_id) %>% filter(!is.na(genome_gene_id)) %>% nrow()
-genome_based %>% distinct(Gene_ID) %>% nrow()
-```
-
-
-```{r}
-# Totals per source
-source_counts <- overlap_data %>%
-  summarise(
-    eggnog_total    = sum(has_eggnog),
-    ips_total       = sum(has_ips),
-    trinotate_total = sum(has_trinotate),
-    genome_total    = sum(has_genome)
-  )
-
-# Explicit unannotated count
-unannotated <- sum(overlap_matrix$has_eggnog == 0 &
-                   overlap_matrix$has_ips == 0 &
-                   overlap_matrix$has_trinotate == 0 &
-                   overlap_matrix$has_genome == 0)
-
-# Combine into tidy dataframe
-bar_data <- data.frame(
-  Source = c("EggNOG","IPS","Trinotate","Genome","Unannotated"),
-  Count  = c(source_counts$eggnog_total,
-             source_counts$ips_total,
-             source_counts$trinotate_total,
-             source_counts$genome_total,
-             unannotated)
-)
-
-# Barplot
-ggplot(bar_data, aes(x=Source, y=Count, fill=Source)) +
-  geom_bar(stat="identity") +
-  labs(title="Annotated vs Unannotated Genes",
-       x="Annotation Source",
-       y="Number of Genes") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position="none")
-```
-```{r}
-# Count unique genome genes flagged as TRUE
-genome_true_total <- genome_flags %>%
-  filter(has_genome) %>%
-  summarise(n = n_distinct(genome_gene_id)) %>%
-  pull(n)
-
-genome_true_total
-```
-
--------------
-
 ## Tier annotations 
 
-## Load all tier gene sets
+### Load all tier gene sets
 ```{r}
 # Tier 1: shared temperature-responsive genes
 tier1_genes <- read_csv(
@@ -1369,7 +981,7 @@ tier2_genes <- read_csv(
 
 # Tier 2b: locally adapted thermal genes
 tier2b_genes <- read_csv(
-  "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2_local_adaptation_genes.csv"
+  "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv"
 )$gene_id
 
 # Tier 3: hybrid inheritance categories
@@ -1417,9 +1029,13 @@ tier_sizes <- tibble(
               length(tier2b_tier3_parent_W))
 )
 
-print(tier_sizes)
-```
+knitr::kable(
+  tier_sizes,
+  caption = "Number of genes per tier and intersection",
+  align = "c"
+)
 
+```
 
 
 
@@ -1464,98 +1080,26 @@ all_tiers_and_intersections <- bind_rows(
   tier2b_tier3_mis_table, tier2b_tier3_parentS_table, tier2b_tier3_parentW_table
 )
 
-# Main tiers
-tier1_table
-tier2_table
-tier2b_table
-tier3_mis_table
-tier3_parentS_table
-tier3_parentW_table
+# Preview of master table
+shorten <- function(x, n = 50) {
+  ifelse(nchar(x) > n, paste0(substr(x, 1, n), "..."), x)
+}
 
-# Intersections
-tier1_tier3_mis_table
-tier1_tier3_parentS_table
-tier1_tier3_parentW_table
-tier2b_tier3_mis_table
-tier2b_tier3_parentS_table
-tier2b_tier3_parentW_table
+preview_table <- all_tiers_and_intersections %>%
+  mutate(across(where(is.character), ~ shorten(.)))
+
+datatable(
+  head(preview_table, 100),
+  options = list(pageLength = 20, scrollX = TRUE),
+  caption = "Preview of classified genes (truncated text fields)"
+)
 
 ```
 
-```{r}
-# Count total rows with a non-NA genome_gene_id
-total_ids <- tier2b_table %>% filter(!is.na(genome_gene_id)) %>% nrow()
-
-# Count unique non-NA genome_gene_id values
-unique_ids <- tier2b_table %>% filter(!is.na(genome_gene_id)) %>% 
-  pull(genome_gene_id) %>% n_distinct()
-
-cat("Total rows with genome_gene_id:", total_ids, "\n")
-cat("Unique genome_gene_id:", unique_ids, "\n")
-
-# Find duplicated genome_gene_id values
-dup_ids <- tier2b_table %>%
-  filter(!is.na(genome_gene_id)) %>%
-  count(genome_gene_id) %>%
-  filter(n > 1)
-
-cat("Duplicated genome_gene_id count:", nrow(dup_ids), "\n")
-print(dup_ids)
-
-# Weakly annotated genes (all columns)
-weakly <- tier2b_table %>%
-  filter(annotation_class == "Weakly annotated")
-
-# Partially annotated genes (all columns)
-partial <- tier2b_table %>%
-  filter(annotation_class == "Partially annotated")
-
-# Unannotated genes (all columns)
-unannotated <- tier2b_table %>%
-  filter(annotation_class == "Unannotated")
-
-# Well-annotated genes (all columns)
-well <- tier2b_table %>%
-  filter(annotation_class == "Well-annotated")
-
-# Inspect them
-weakly
-partial
-unannotated
-well
-```
-TRINITY_GG_416_c2774_g1
-```{r}
-# See all column names
-colnames(tier2b_table)
-
-# See the structure of the table (column names, types)
-str(tier2b_table)
-
-# Peek at the first 10 rows
-head(tier2b_table, 10)
-
-# Glimpse a compact overview (dplyr)
-dplyr::glimpse(tier2b_table)
-
-# Count how many unique genome_gene_id vs trinity_gene_id
-tier2b_table %>%
-  summarise(
-    n_genome_genes  = n_distinct(genome_gene_id),
-    n_trinity_genes = n_distinct(gene_id),   # Trinity IDs are in gene_id
-    total_rows      = n()
-  )
-
-# Check for duplicated genome_gene_id values
-tier2b_table %>%
-  count(genome_gene_id) %>%
-  filter(n > 1) %>%
-  arrange(desc(n))
-```
 
 
-## Tier summaries
-```{r}
+### Tier class summaries
+```{r tier_class_summaries}
 # Helper: summarise annotation classes as proportions
 summarise_tier <- function(gene_ids, tier_name, classified_table) {
   classified_table %>%
@@ -1592,6 +1136,8 @@ ggplot(all_tiers_summary, aes(x=tier, y=percent, fill=annotation_class)) +
   theme_minimal(base_size = 14) +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ```
+
+
 Annotation completeness declined from Tier1 to Tier2 to Tier2b. Tier1 genes were predominantly well‑annotated, reflecting their conserved nature and strong representation in reference databases. Tier2 included a larger and more diverse set, which reduced annotation rates. Although Tier2b only contains 32 genes, it showed the highest proportion of unannotated genes, consistent with the expectation that temperature‑responsive, locally adapted genes may be fast‑evolving and therefore less likely to be captured in current databases. 
 
 In contrast, Tier3 sets (misexpressed and parental) were overwhelmingly well‑annotated (>85–90%), with only ~5% of genes lacking annotation. The similar annotation proportions across Tier3_mis, Tier3_parent_S, and Tier3_parent_W indicate that hybrid misexpression does not preferentially involve novel or unannotated transcripts, but rather affects conserved, well‑characterized genes that are also inherited from the parental populations.
@@ -1604,27 +1150,8 @@ The larger size of the Tier2b∩Tier3_parent_W intersection compared to the sing
 
 ------
 
-```{r}
-colnames(integrated_table)
-```
-```{r}
-# Check for zebrafish IDs in multiple formats
-zebrafish_hits <- sum(grepl("7955\\.", integrated_table$egg_ortholog)) +
-                  sum(grepl("ENSDARG", integrated_table$egg_ortholog)) +
-                  sum(grepl("DANRE", integrated_table$genome_UniProt))
-
-# Check for human IDs in multiple formats
-human_hits <- sum(grepl("9606\\.", integrated_table$egg_ortholog)) +
-              sum(grepl("ENSP|ENSG", integrated_table$egg_ortholog)) +
-              sum(grepl("HUMAN", integrated_table$genome_UniProt))
-
-zebrafish_hits
-human_hits
-```
-
-```{r}
-library(dplyr)
-
+### Tier‑level Ortholog Annotation Summary
+```{r tier_orhtolog_summary}
 tier_summary <- all_tiers_and_intersections %>%
   mutate(zebrafish_hit = grepl("7955|ENSDARG|DANRE", 
                                paste(egg_ortholog, trinotate_BLASTX, trinotate_BLASTP, genome_UniProt),
@@ -1642,47 +1169,43 @@ tier_summary <- all_tiers_and_intersections %>%
     unannotated     = total_genes - annotated
   )
 
-print(tier_summary)
+
+knitr::kable(
+  tier_summary,
+  caption = "Counts of zebrafish and human ortholog hits per tier",
+  align = "c"
+)
 ```
 
+
+
+## Tier 2b example: partial genome reconstruction of a cyclin‑dependent kinase regulator (CKS1)
 
 ```{r}
-# --- Compare transcript-level vs collapsed genome counts ---
-
-# Transcript-level genome counts (as currently in overlap_data)
-genome_transcript_total <- sum(overlap_data$has_genome)
-
-# Collapsed unique genome gene IDs
-unique_genome_ids <- genome_based %>%
-  filter(!is.na(Gene_ID) & Gene_ID != "NA" & Gene_ID != "") %>%
-  distinct(Gene_ID)
-
-genome_unique_total <- nrow(unique_genome_ids)
-
-# Combine into tidy dataframe
-genome_count_comparison <- tibble(
-  Level  = c("Transcript-level overlaps", "Unique genome gene IDs"),
-  Count  = c(genome_transcript_total, genome_unique_total)
-)
-
-print(genome_count_comparison)
-
-# Optional barplot
-ggplot(genome_count_comparison, aes(x=Level, y=Count, fill=Level)) +
-  geom_bar(stat="identity") +
-  labs(title="Genome annotation counts: transcript vs unique gene IDs",
-       x="Annotation level",
-       y="Number of entries") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position="none")
+tier2b_table %>%
+  filter(gene_id == "TRINITY_GG_416_c2774_g1") %>%
+  datatable(
+    rownames = FALSE,
+    options = list(
+      dom = "t",           
+      pageLength = 1,
+      ordering = FALSE
+    ),
+    caption = htmltools::tags$caption(
+      style = "caption-side: top; font-weight: bold;",
+      "Tier 2b example gene (moderate transcriptome–genome coverage)"
+    )
+  )
 ```
 
-## Tier2b
 TRINITY_GG_416_c2774_g1 represents a Trinity‑assembled gene with strong homology to cyclin‑dependent kinase regulatory subunit 1 (CKS1). BLAST searches against UniProt identify multiple high‑confidence alignments to CKS1_MOUSE (P61025), each exceeding 90% sequence identity with highly significant E‑values, supporting functional conservation. Among its isoforms, TRINITY_GG_416_c2774_g1_i14 achieved a maximum alignment of ~65% coverage to the genome‑annotated mRNA FUNCG00000020675. This indicates that the genome gene/mRNA model is only partially reconstructed relative to the Trinity assembly. Importantly, the genome‑based annotation was informative: InterPro, Pfam, SMART, and ProSite domain assignments (e.g. IPR000789, PF01111, SM01084, PS00944/45) provided a GO term consistent with cyclin‑dependent protein kinase regulator activity (GO:0016538). In this case, the Trinity assembly provides a more complete sequence that reinforces and complements the functional assignment derived from the genome annotation. 
 CKS1 proteins are canonical regulators of cyclin‑dependent kinases, controlling cell cycle progression and transcriptional programs. While they are not classical “temperature response” genes like heat shock proteins, their regulatory role means they can indirectly influence how cells cope with stress. Temperature shifts often impose cellular stress that requires adjustments in proliferation, DNA repair, and transcriptional regulation. In this study, TRINITY_GG_416_c2774_g1 was differentially expressed between corkwing wrasse populations exposed to thermal treatments, suggesting that modulation of CDK activity may contribute to population‑specific responses and local adaptation to contrasting temperature regimes. A change in CKS1 expression could therefore reflect altered cell cycle control or stress adaptation pathways under different thermal environments.
 
 
-
+# Session Info
+```{r session_info} 
+sessionInfo()
+```
 
 
 

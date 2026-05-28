@@ -16,21 +16,18 @@ knitr::opts_knit$set(
 
 # Model comparison via likelihood ratio tests (LRTs)
 
-## Setup and load required libraries
+## Load required libraries
 ```{r packages, results='hide'}
-# Load libraries 
+
 suppressPackageStartupMessages({
-  library(DESeq2)
   library(tidyverse)
-  library(dplyr)
+  library(DESeq2)
   library(UpSetR)
-  library(ggplot2)
   library(variancePartition)
   library(BiocParallel)
   library(limma)
   library(readxl)
-	library(knitr)
-	library(pheatmap)
+  library(pheatmap)
 })
 ```
 

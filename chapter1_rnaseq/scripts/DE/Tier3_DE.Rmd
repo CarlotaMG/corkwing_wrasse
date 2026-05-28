@@ -6,6 +6,7 @@ output:
   html_document:
     toc: true
     toc_float: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -15,21 +16,20 @@ knitr::opts_knit$set(
 ```
 
 
-## Setup and Package Loading
+## Package Loading
 ```{r packages}
-# Load required packages
+
 suppressPackageStartupMessages({
+  library(tidyverse)
+  library(DESeq2)
+  library(ashr)
   library(readxl)
-	library(DESeq2)      
-  library(ashr)        
-  library(tidyverse)   
-  library(dplyr)
   library(rlang)
   library(ggVennDiagram)
-  library(readr)
   library(DT)
-
+	library(here)
 })
+
 ```
 
 
@@ -131,7 +131,7 @@ cat("After filtering:", final_n, "\n")
 cat("Retained:", round(final_n / initial_n * 100, 2), "%\n")
 ```
 
-# DESeq2 Model Setup
+## DESeq2 Model Setup
 ```{r deseq_setup}
 # Ensure condition is a factor with correct ordering
 sample_info$condition <- factor(
@@ -159,7 +159,7 @@ dds <- DESeq(dds)
 
 cat("DESeq2 model fitted for Tier 3 analysis\n")
 ```
-# Differential Expression for Tier 3 Contrasts
+## Differential Expression for Tier 3 Contrasts
 ```{r DE_contrasts}
 
 # Define output directory 
@@ -230,7 +230,7 @@ for (t in temps) {
 ```
 
 
-# Build sample-to-condition mapping
+## Build sample-to-condition mapping
 ```{r sample_mapping}
 
 # sample_info must contain columns: condition, sample
@@ -263,7 +263,7 @@ Expression patterns
             └── Transgressive down
 ```
 
-# Expression Classification for Tier 3 (per temperature)
+## Expression Classification for Tier 3 (per temperature)
 ```{r express_classification}
 
 classify_expression <- function(temp) {
@@ -352,7 +352,7 @@ classify_expression <- function(temp) {
 }
 ```
 
-# Run classification for all temperatures
+## Run classification for all temperatures
 ```{r temp_class}
 DE_12 <- classify_expression(12)
 DE_15 <- classify_expression(15)
@@ -362,7 +362,7 @@ DE_all <- bind_rows(DE_12, DE_15, DE_18)
 table(DE_all$temperature, DE_all$category)
 
 ```
-# Decompose "other" category into meaningful subgroups
+## Decompose "other" category into meaningful subgroups
 ```{r other_decomposition}
 
 
@@ -420,7 +420,7 @@ knitr::kable(other_18, caption = "Decomposition of 'other' isoforms at 18°C")
 
 We decomposed the heterogeneous ‘other’ category into interpretable subgroups. Isoforms classified as only_HS or only_HW showed asymmetric divergence, differing from one parent but not the other, but were not considered parent‑like because parental divergence was absent. The only_SW group captured parental divergence without hybrid divergence. Discordant cases represented hybrids positioned between parents yet still significantly diverging from one or both. The majority of isoforms did not meet these definitions and are reported as a residual group, reflecting missing values or heterogeneous patterns that cannot be assigned to a specific inheritance category under our criteria.
 
-# Summary of expression categories across temperatures
+## Summary of expression categories across temperatures
 ```{r summarize_categories}
 summary_table <- DE_all %>%
   group_by(temperature, category) %>%
@@ -432,7 +432,7 @@ summary_table
 ```
 
 
-# Visualization: Stacked barplot of categories per temperature
+## Visualization: Stacked barplot of categories per temperature
 ```{r plot_categories}
 
 library(ggplot2)
@@ -454,7 +454,7 @@ The majority of isoforms fall into the conserved and additive categories, showin
 
 At 12°C, balanced replication (n=5 per origin) meant that DESeq2 produced valid padj values for nearly all isoforms. As a result, our classification function could assign most isoforms cleanly, leading to a large increase in the “conserved” category (86,896) and a much smaller “other” category (3,290). At 15°C and 18°C, however, the lower replication of South origin fish (n=2) limited statistical power in the parental contrast, producing many NA padj values and inflating the “other” category (37,799 and 43,112 isoforms, respectively).
 
-# Visualization: Focus on rare categories
+## Visualization: Focus on rare categories
 ```{r plot_rare_categories}
 
 rare_cats <- c("parent_like_S", "parent_like_W",
@@ -477,7 +477,7 @@ ggplot(DE_rare, aes(x = factor(temperature), fill = category)) +
 
 Most misregulated isoforms in hybrids show transgressive expression, meaning hybrid expression lies outside the parental range. Transgressive misexpression is the most extreme form of regulatory incompatibility and is often associated with reduced hybrid fitness.
 
-# Export ALL misexpressed isoforms per temperature (combined)
+## Export ALL misexpressed isoforms per temperature (combined)
 ```{r export_misexpressed_combined}
 
 # Ensure output directory exists
@@ -503,7 +503,7 @@ for (temp in c(12, 15, 18)) {
 ```
 
 
-# Export parent like isoforms per temperature
+## Export parent like isoforms per temperature
 ```{r export_parent_like}
 # Ensure output directory exists
 dir.create("results/DE/tier3_DE/parent_like", recursive = TRUE, showWarnings = FALSE)
@@ -525,7 +525,7 @@ for (cat in c("parent_like_S", "parent_like_W")) {
 }
 ```
 
-# Summarize DE counts per contrast and temperature
+## Summarize DE counts per contrast and temperature
 ```{r contrast_summary}
 
 contrast_summary <- data.frame()
@@ -764,7 +764,7 @@ The limited overlaps across temperature treatments show that distinct gene sets 
 
 ## Intersections with Tiers 1 and 2b
 
-## Load Tier 1 and Tier 2b gene sets
+### Load Tier 1 and Tier 2b gene sets
 ```{r load_genes_tier_1_2}
 # Tier 1: shared temperature-responsive genes
 tier1_genes <- read.csv(
@@ -778,7 +778,7 @@ tier2b_genes <- read.csv(
   header = TRUE
 )$gene_id
 ```
-## Build Tier 3 gene sets (combined across temperatures)
+### Build Tier 3 gene sets (combined across temperatures)
 ```{r genes_tier_3}
 
 # Misexpressed genes 
@@ -803,7 +803,7 @@ parent_like_W <- unique(c(
 ))
 ```
 
-## Summary table of tier 3 gene sets (temperature combined)
+### Summary table of tier 3 gene sets (temperature combined)
 ```{r sum_table_tier3_genes_combined}
 ## Summary table of Tier 3 gene sets
 tier3_summary <- data.frame(
@@ -832,7 +832,7 @@ write_csv(data.frame(gene_id = parent_like_W),
           "results/functional_enrichment/tier3_hybrid_inheritance/tier3_parent_like_W_genes.csv")
 ```
 
-## Intersections with Tier 1 and Tier 2b
+### Intersections with Tier 1 and Tier 2b
 ```{r}
 # Tier 1 intersections
 tier1_misexpressed  <- intersect(tier1_genes, misexpressed)
@@ -845,7 +845,7 @@ tier2b_parent_like_S <- intersect(tier2b_genes, parent_like_S)
 tier2b_parent_like_W <- intersect(tier2b_genes, parent_like_W)
 ```
 
-## Summary table of Tier 1 & Tier 2b intersections
+### Summary table of Tier 1 & Tier 2b intersections
 ```{r}
 intersection_summary <- data.frame(
   Category = c("Misexpressed", "Parent-like S", "Parent-like W"),
@@ -923,6 +923,9 @@ DT::datatable(
 )
 ```
 
-
+## Session Info
+```{r session_info} 
+sessionInfo()
+```
 
 

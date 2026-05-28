@@ -1,0 +1,1297 @@
+---
+title: "Functional Enrichment"
+author: "Carlota Myhre de Gouveia"
+date: "2026-04-27"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
+```
+
+# Analysis 
+## Package Loading
+```{r packages}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(gprofiler2)
+  library(clusterProfiler)
+  library(enrichplot)
+  library(org.Hs.eg.db)
+	library(here)
+})
+```
+
+## Data Import and Tier Definition
+```{r load_and_define_tiers}
+
+# Helper functions
+
+load_tier <- function(path) {
+  df <- read_csv(path, show_col_types = FALSE)
+  names(df)[1] <- "gene_id"
+  distinct(df)
+}
+
+extract_gene_id <- function(x) {
+  x %>%
+    str_remove("\\.p\\d+$") %>%   # remove .p1, .p2
+    str_remove("_i\\d+$")         # remove isoform suffix (_i1, _i2)
+}
+
+
+# Load Tier 1 and Tier 2 gene sets
+
+tier1 <- load_tier(
+  "results/functional_enrichment/tier1_shared_temperature_response/tier1_shared_temperature_genes.csv"
+)
+
+tier2 <- load_tier(
+  "results/functional_enrichment/tier2_pop_divergence/tier2_pop_divergence_genes.csv"
+)
+
+tier2b <- load_tier(
+  "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv"
+)
+
+
+# Load Tier 3 DE outputs (by temperature)
+
+tier3_mis_12C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/misexpressed/misexpressed_12C.tsv", col_names = FALSE)$X1
+)
+tier3_mis_15C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/misexpressed/misexpressed_15C.tsv", col_names = FALSE)$X1
+)
+tier3_mis_18C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/misexpressed/misexpressed_18C.tsv", col_names = FALSE)$X1
+)
+
+tier3_parent_S_12C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_S_12C.tsv", col_names = FALSE)$X1
+)
+tier3_parent_S_15C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_S_15C.tsv", col_names = FALSE)$X1
+)
+tier3_parent_S_18C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_S_18C.tsv", col_names = FALSE)$X1
+)
+
+tier3_parent_W_12C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_W_12C.tsv", col_names = FALSE)$X1
+)
+tier3_parent_W_15C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_W_15C.tsv", col_names = FALSE)$X1
+)
+tier3_parent_W_18C <- extract_gene_id(
+  read_tsv("results/DE/tier3_DE/parent_like/parent_like_W_18C.tsv", col_names = FALSE)$X1
+)
+
+
+# Load merged Tier 3 sets
+
+tier3_mis_all <- load_tier(
+  "results/functional_enrichment/tier3_hybrid_inheritance/tier3_misexpressed_genes.csv"
+)
+
+tier3_parent_S_all <- load_tier(
+  "results/functional_enrichment/tier3_hybrid_inheritance/tier3_parent_like_S_genes.csv"
+)
+
+tier3_parent_W_all <- load_tier(
+  "results/functional_enrichment/tier3_hybrid_inheritance/tier3_parent_like_W_genes.csv"
+)
+
+
+# Load tier intersections
+
+tier1_tier3_mis <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier1_tier3_misexpressed.csv"
+)
+
+tier1_tier3_parent_S <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier1_tier3_parent_like_S.csv"
+)
+
+tier1_tier3_parent_W <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier1_tier3_parent_like_W.csv"
+)
+
+tier2b_tier3_mis <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier2b_tier3_misexpressed.csv"
+)
+
+tier2b_tier3_parent_S <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier2b_tier3_parent_like_S.csv"
+)
+
+tier2b_tier3_parent_W <- load_tier(
+  "results/functional_enrichment/tier_intersections/tier2b_tier3_parent_like_W.csv"
+)
+
+
+# Define all tiers
+
+tiers <- list(
+  "Tier1" = tier1$gene_id,
+  "Tier2" = tier2$gene_id,
+  "Tier2b" = tier2b$gene_id,
+
+  "Tier3_mis_12C" = tier3_mis_12C,
+  "Tier3_mis_15C" = tier3_mis_15C,
+  "Tier3_mis_18C" = tier3_mis_18C,
+
+  "Tier3_parent_S_12C" = tier3_parent_S_12C,
+  "Tier3_parent_S_15C" = tier3_parent_S_15C,
+  "Tier3_parent_S_18C" = tier3_parent_S_18C,
+
+  "Tier3_parent_W_12C" = tier3_parent_W_12C,
+  "Tier3_parent_W_15C" = tier3_parent_W_15C,
+  "Tier3_parent_W_18C" = tier3_parent_W_18C,
+
+  "Tier3_mis_all" = tier3_mis_all$gene_id,
+  "Tier3_parent_S_all" = tier3_parent_S_all$gene_id,
+  "Tier3_parent_W_all" = tier3_parent_W_all$gene_id,
+
+  "Tier1∩Tier3_mis" = tier1_tier3_mis$gene_id,
+  "Tier1∩Tier3_parent_S" = tier1_tier3_parent_S$gene_id,
+  "Tier1∩Tier3_parent_W" = tier1_tier3_parent_W$gene_id,
+
+  "Tier2b∩Tier3_mis" = tier2b_tier3_mis$gene_id,
+  "Tier2b∩Tier3_parent_S" = tier2b_tier3_parent_S$gene_id,
+  "Tier2b∩Tier3_parent_W" = tier2b_tier3_parent_W$gene_id
+)
+```
+
+## Load full eggnog annotation
+```{r load_eggnog}
+ann <- read.delim(
+  "results/annotation/eggnog/Trinity.emapper.annotations",
+  comment.char = "#",
+  header = FALSE,
+  sep = "\t",
+  stringsAsFactors = FALSE,
+  quote = ""
+)
+
+colnames(ann) <- c(
+  "query_name", "seed_ortholog", "evalue", "score", "eggNOG_OGs",
+  "max_annot_lvl", "COG_category", "Description", "Preferred_name",
+  "GOs", "EC", "KEGG_ko", "KEGG_Pathway", "KEGG_Module",
+  "KEGG_Reaction", "KEGG_rclass", "BRITE", "KEGG_TC",
+  "CAZy", "BiGG_Reaction", "PFAMs"
+)
+```
+
+## eggNOG annotation overview 
+```{r eggnog_overview}
+
+# Summary table
+eggnog_overview <- tibble(
+  Metric = c("Annotated entries", "Annotation fields"),
+  Value  = c(nrow(ann), ncol(ann))
+)
+
+knitr::kable(
+  eggnog_overview,
+  caption = "Overview of the eggNOG annotation dataset"
+)
+
+# Column names
+knitr::kable(
+  tibble(Field = colnames(ann)),
+  caption = "eggNOG annotation fields"
+)
+
+# Data preview
+knitr::kable(
+  head(ann),
+  caption = "Preview of the eggNOG annotation table (first 6 rows)"
+)
+```
+
+
+## Build ortholog mapping (Trinity → Preferred_name)
+```{r build_ortholog_mapping}
+# Start from annotation table
+orth_map <- ann %>%
+  dplyr::select(query_name, seed_ortholog, evalue, score, Preferred_name) %>%
+  dplyr::filter(Preferred_name != "-" & Preferred_name != "")
+
+# Clean Trinity IDs down to gene_id and keep evalue/score
+orth_map_clean <- orth_map %>%
+  mutate(
+    gene_id = sub("\\.p[0-9]+$", "", query_name),   # remove .p1, .p2
+    gene_id = sub("_i[0-9]+$", "", gene_id)         # remove isoform _i1, _i2
+  ) %>%
+  filter(Preferred_name != "-" & Preferred_name != "") %>%
+  distinct(gene_id, Preferred_name, evalue, score)
+
+# Keep ALL valid orthologs per gene (no collapsing to best)
+orth_map_all <- orth_map_clean %>%
+  distinct(gene_id, Preferred_name, evalue, score)
+
+
+# Overview table 
+ortholog_overview <- tibble(
+  Metric = c(
+    "Ortholog assignments (rows)",
+    "Unique Trinity genes",
+    "Unique preferred names"
+  ),
+  Value = c(
+    nrow(orth_map_all),
+    dplyr::n_distinct(orth_map_all$gene_id),
+    dplyr::n_distinct(orth_map_all$Preferred_name)
+  )
+)
+
+
+knitr::kable(
+  ortholog_overview,
+  caption = "Overview of the Trinity–ortholog mapping"
+)
+```
+
+## Ortholog mapping overview
+```{r ortholog_mapping_preview} 
+knitr::kable(
+  head(orth_map_all),
+  caption = "Preview of the ortholog mapping table (first 6 rows)"
+)
+```
+
+
+## Map tiers to orthologs
+```{r map_tiers_to_orthologs} 
+# Helper function: map a tier tibble/vector to orthologs
+map_to_orthologs <- function(gene_ids, orth_map) {
+  orth_map %>%
+    filter(gene_id %in% gene_ids) %>%
+    pull(Preferred_name) %>%
+    unique()
+}
+
+# Helper: count how many genes in a set have at least one ortholog
+count_mapped_genes <- function(gene_ids, orth_map) {
+  mapped <- orth_map %>%
+    filter(gene_id %in% gene_ids) %>%
+    distinct(gene_id)
+  nrow(mapped)
+}
+
+# Apply mapping to all tiers using ALL orthologs
+tier_orthologs <- lapply(tiers, map_to_orthologs, orth_map = orth_map_all)
+
+# Orthology summary (all orthologs retained)
+ortholog_summary <- tibble(
+  tier = names(tiers),
+  total_genes = sapply(tiers, length),
+  genes_with_orthologs = sapply(tiers, count_mapped_genes, orth_map = orth_map_all),
+  distinct_orthologs = sapply(tier_orthologs, length)
+) %>%
+  mutate(
+    coverage_pct = round((genes_with_orthologs / total_genes) * 100, 1)
+  )
+```
+
+```{r ortholog_mapping_summary}
+knitr::kable(
+  ortholog_summary,
+  caption = "Summary of ortholog mapping across tiers"
+)	
+```
+
+
+## Run GO enrichment for all tiers
+```{r run_go_enrichment}
+
+# Classify tiers based on ortholog support 
+tier_classes <- tibble(
+  tier = names(tier_orthologs),
+  n_orthologs = sapply(tier_orthologs, length)
+) %>%
+  mutate(
+    enrichment_class = case_when(
+      n_orthologs >= 50 ~ "robust",
+      n_orthologs >= 15 ~ "grey",
+      TRUE              ~ "small"
+    )
+  )
+
+# Size‑aware GO enrichment function
+run_go_enrichment <- function(orthologs, tier_name, tier_class) {
+
+  # Too small → no ORA
+  if (tier_class == "small") {
+    message(
+      "Skipping ", tier_name,
+      " (", length(orthologs), " orthologs: too small for ORA)"
+    )
+    return(NULL)
+  }
+
+  # Grey‑zone and robust tiers:
+  # use ALL GO domains (BP, MF, CC)
+  sources <- c("GO:BP", "GO:MF", "GO:CC")
+
+  gp <- tryCatch(
+    gost(
+      query = orthologs,
+      organism = "hsapiens",
+      correction_method = "fdr",
+      sources = sources
+    ),
+    error = function(e) {
+      message("g:Profiler failed for ", tier_name)
+      return(NULL)
+    }
+  )
+
+  if (is.null(gp) || is.null(gp$result) || nrow(gp$result) == 0) {
+    return(NULL)
+  }
+
+  # Attach metadata for interpretation
+  gp$result <- gp$result %>%
+    mutate(
+      tier = tier_name,
+      enrichment_class = tier_class,
+      n_orthologs_tested = length(orthologs)
+    )
+
+  gp
+}
+
+# Run enrichment for all tiers, adapting by size class
+enrichment_outputs <- lapply(seq_len(nrow(tier_classes)), function(i) {
+
+  tn  <- tier_classes$tier[i]
+  cls <- tier_classes$enrichment_class[i]
+
+  run_go_enrichment(
+    orthologs = tier_orthologs[[tn]],
+    tier_name = tn,
+    tier_class = cls
+  )
+})
+
+names(enrichment_outputs) <- tier_classes$tier
+```
+
+
+## Build GO enrichment summary
+```{r build_enrichment_summary}   
+
+enrichment_summary <- tier_classes %>%
+  mutate(
+    enrichment_run = sapply(
+      tier,
+      function(tn) !is.null(enrichment_outputs[[tn]])
+    ),
+    n_terms = sapply(
+      tier,
+      function(tn) {
+        gp <- enrichment_outputs[[tn]]
+        if (is.null(gp)) 0 else nrow(gp$result)
+      }
+    )
+  )
+
+knitr::kable(
+  enrichment_summary,
+  caption = "GO enrichment summary across tiers"
+)
+
+```
+
+## Build GO enrichment table
+```{r go_table_and_preview}
+
+# Build GO master table
+go_all <- lapply(names(enrichment_outputs), function(tn) {
+  gp <- enrichment_outputs[[tn]]
+  
+  if (!is.null(gp) && !is.null(gp$result) && nrow(gp$result) > 0) {
+    df <- gp$result
+    df$tier <- tn
+    return(df)
+  }
+  
+  NULL
+}) |> bind_rows()
+
+# Preview across tiers and GO domains
+go_all %>%
+  dplyr::group_by(tier, source) %>%
+  dplyr::slice_head(n = 2) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(tier, source, term_name, p_value) %>%
+  knitr::kable(
+    caption = "GO enrichment results (preview across tiers and ontologies)"
+  )
+```
+
+## Plot GO enrichment results for all tiers
+```{r plot_go_enrichment}
+
+for (tn in names(enrichment_outputs)) {
+
+  gp <- enrichment_outputs[[tn]]
+  if (is.null(gp)) next
+
+  tier_class <- tier_classes$enrichment_class[
+    tier_classes$tier == tn
+  ]
+
+  label <- if (tier_class == "grey") {
+    paste("GO enrichment (exploratory) –", tn)
+  } else {
+    paste("GO enrichment –", tn)
+  }
+
+  suppressWarnings({
+    p <- gostplot(gp, capped = TRUE, interactive = FALSE) +
+      ggtitle(label) +
+      theme(plot.title = element_text(hjust = 0.5))
+    print(p)
+  })
+}
+```
+
+
+Gene sets derived from Tier 1 and Tier 2b showed contrasting functional enrichment profiles. Tier 1‑based sets consistently exhibited strong GO enrichment together with relatively high ortholog coverage, and retained clear enrichment even in smaller Tier 1‑derived subsets. The higher ortholog coverage in Tier 1 indicates that these genes are more evolutionarily conserved compared to Tier 2b.
+In contrast, Tier 2b displayed reduced ortholog coverage and limited GO enrichment, indicating greater functional heterogeneity among candidates for population‑specific thermal adaptation. This pattern suggests that Tier 2b is enriched for more lineage‑specific or rapidly evolving genes whose roles are distributed across diverse molecular functions rather than concentrated within a small number of shared biological pathways.
+
+
+## Dotplots for all tiers 
+```{r go_dotplots}  
+
+go_dotplot <- function(gp_result, tier_class, domain = "GO:BP", n = 10, title = NULL) {
+
+  df <- gp_result %>%
+    filter(source == domain) %>%
+    arrange(p_value)
+
+  if (nrow(df) == 0) return(NULL)
+
+  # Grey tiers: show all enriched terms
+  # Robust tiers: show top n terms
+  if (tier_class != "grey") {
+    df <- slice_head(df, n = n)
+  }
+
+  df <- df %>%
+    mutate(
+      term_name = str_wrap(term_name, width = 40),
+      term_name = factor(term_name, levels = rev(term_name))
+    )
+
+  ggplot(df, aes(
+    x = -log10(p_value),
+    y = term_name,
+    size = intersection_size
+  )) +
+    geom_point(color = "#2C7BB6") +
+    labs(
+      x = "-log10(FDR)",
+      y = "",
+      title = title
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.y = element_text(size = 9))
+}
+
+# Dotplots per tier and GO domain
+for (tn in names(enrichment_outputs)) {
+
+  gp <- enrichment_outputs[[tn]]
+  if (is.null(gp)) next
+
+  tier_class <- tier_classes$enrichment_class[
+    tier_classes$tier == tn
+  ]
+
+  df <- gp$result
+  if (is.null(df) || nrow(df) == 0) next
+
+  if (any(df$source == "GO:BP")) {
+    print(go_dotplot(
+      df,
+      tier_class = tier_class,
+      domain = "GO:BP",
+      title = paste(tn, "— Biological Process")
+    ))
+  }
+
+  if (any(df$source == "GO:MF")) {
+    print(go_dotplot(
+      df,
+      tier_class = tier_class,
+      domain = "GO:MF",
+      title = paste(tn, "— Molecular Function")
+    ))
+  }
+
+  if (any(df$source == "GO:CC")) {
+    print(go_dotplot(
+      df,
+      tier_class = tier_class,
+      domain = "GO:CC",
+      title = paste(tn, "— Cellular Component")
+    ))
+  }
+}
+```
+
+
+## KEGG enrichment 
+
+### KEGG analysis
+```{r kegg_enrichment} 
+# Helper function: map gene symbols to Entrez IDs
+map_to_entrez <- function(symbols) {
+  bitr(
+    symbols,
+    fromType = "SYMBOL",
+    toType   = "ENTREZID",
+    OrgDb    = org.Hs.eg.db
+  )$ENTREZID
+}
+
+kegg_outputs <- list()
+
+# Perform KEGG enrichment for all tiers
+for (tn in names(tier_orthologs)) {
+
+  symbols <- tier_orthologs[[tn]]
+  if (is.null(symbols) || length(symbols) == 0) next
+
+  entrez_ids <- map_to_entrez(symbols)
+  if (length(entrez_ids) == 0) next
+
+  ek <- enrichKEGG(
+    gene          = entrez_ids,
+    organism      = "hsa",
+    pAdjustMethod = "BH"
+  )
+
+  if (!is.null(ek) && nrow(as.data.frame(ek)) > 0) {
+    kegg_outputs[[tn]] <- ek
+  }
+}
+
+# Dotplots for all tiers (KEGG)
+for (tn in names(kegg_outputs)) {
+
+  ek <- kegg_outputs[[tn]]
+  if (is.null(ek) || nrow(as.data.frame(ek)) == 0) next
+
+  print(
+    dotplot(ek, showCategory = 10) +
+      ggtitle(paste(tn, "— KEGG pathway enrichment"))
+  )
+}
+
+
+
+
+```
+
+
+
+### KEGG enrichment summary 
+```{r KEGG_summary}
+
+all_tiers <- names(tier_orthologs)
+
+kegg_summary <- tibble(
+  tier = all_tiers,
+  total_symbols = sapply(all_tiers, function(tn) length(tier_orthologs[[tn]])),
+  mapped_entrez = sapply(all_tiers, function(tn) {
+    length(unique(map_to_entrez(tier_orthologs[[tn]])))
+  }),
+  enriched_pathways = sapply(all_tiers, function(tn) {
+    ek <- kegg_outputs[[tn]]
+    if (!is.null(ek) && nrow(as.data.frame(ek)) > 0) {
+      nrow(as.data.frame(ek))
+    } else {
+      0
+    }
+  })
+)
+
+knitr::kable(
+  kegg_summary,
+  caption = "Summary of KEGG pathway enrichment across tiers"
+)
+
+```
+
+### Extract KEGG pathways
+```{r kegg_long_internal}
+
+kegg_tables <- lapply(names(kegg_outputs), function(tn) {
+  ek <- kegg_outputs[[tn]]
+  if (!is.null(ek) && nrow(as.data.frame(ek)) > 0) {
+    df <- as.data.frame(ek)[, c("Description", "p.adjust", "GeneRatio")]
+    df$tier <- tn
+    df
+  } else {
+    NULL
+  }
+})
+
+kegg_all <- bind_rows(kegg_tables)
+```
+
+
+```{r save_enrichment_outputs, include=FALSE}
+
+# Save GO enrichment results
+write_csv(
+  go_all,
+  here::here("results/functional_enrichment/go_enrichment_all_tiers.csv")
+)
+
+# Save KEGG enrichment results
+write_csv(
+  kegg_all,
+  here::here("results/functional_enrichment/kegg_enrichment_all_tiers.csv")
+)
+
+# Save ortholog summary
+write_csv(
+  ortholog_summary,
+  here::here("results/functional_enrichment/ortholog_summary.csv")
+)
+
+# Save KEGG summary
+write_csv(
+  kegg_summary,
+  here::here("results/functional_enrichment/kegg_summary.csv")
+)
+
+```
+
+
+# Results
+
+## Tier 1 – Temperature Response Core Genes
+
+- **Total genes:** 593  
+- **Genes with orthologs:** 432  
+
+### GO enrichment:
+- Extracellular matrix (ECM) and extracellular compartments (including vesicles and exosomes)  
+- Collagen and ECM structural constituents  
+- Cytoplasm and cytosolic components  
+- Intracellular and endomembrane organization  
+- Developmental and morphogenetic processes  
+- Regulatory responses to endogenous stimuli and signaling  
+
+These GO enrichments collectively point to **tissue structure** (ECM and collagen components), **cellular organization** (cytoplasmic, endomembrane, and vesicle‑associated processes), and **coordinated regulatory processes** (developmental, morphogenetic, and endogenous stimulus‑responsive pathways) underlying conserved temperature‑responsive gene expression.
+
+### KEGG enrichment:
+- Proteoglycans in cancer  
+- Integrin signaling  
+- Biosynthesis of amino acids  
+- Cysteine and methionine metabolism  
+- One‑carbon pool by folate  
+- Inflammatory mediator regulation of TRP channels  
+
+These KEGG pathways collectively highlight the **joint enrichment** of **extracellular matrix remodeling and cell–matrix signaling** (proteoglycan and integrin pathways), together with **core metabolic processes** (amino‑acid biosynthesis, sulfur amino‑acid metabolism, and one‑carbon metabolism) and **temperature‑sensitive signaling mechanisms** mediated by TRP channels.
+
+Tier 1 defines the baseline molecular architecture of temperature‑responsive gene expression. Enrichment of ECM‑ and collagen‑related GO terms together with KEGG pathways for proteoglycans and integrin signaling reflects tight coupling between extracellular structure and cell–matrix communication. Enrichment of developmental and morphogenetic GO terms further indicates involvement of conserved growth and tissue‑remodeling pathways in the transcriptional response to temperature. Together, the co‑enrichment of structural, metabolic, and signaling pathways indicates that conserved temperature‑responsive transcription operates through a coordinated engagement of multiple biological systems across tissues.
+
+
+## Tier 2 – Population‑Specific Transcriptional Divergence
+
+- **Total genes:** 1,498
+- **Genes with orthologs:** 1,001  
+
+### GO enrichment:
+- Cytoplasm and cytosolic components  
+- Intracellular organelles and endomembrane organization  
+- Protein binding and protein‑level regulatory activities  
+- Intracellular transport, localization, and vesicle‑mediated processes  
+- Regulation of biological and cellular processes, including signaling and response pathways  
+
+These GO enrichments collectively point to **intracellular organization** (cytoplasmic, organellar, and endomembrane components), **protein‑level regulatory control** (binding, modification, and adaptor activities), and **cellular logistics and communication** (transport, localization, vesicles, and junction‑associated processes) underlying population‑specific transcriptional divergence.
+
+### KEGG enrichment:
+- IgSF cell adhesion molecule (CAM) signaling  
+- Tight junction  
+- Ribosome  
+- Valine, leucine, and isoleucine degradation  
+- Propanoate metabolism  
+- Coronavirus disease (COVID‑19)  
+- Thyroid cancer  
+
+These KEGG pathways highlight the joint enrichment of **cell–cell interaction and cellular interface pathways** (IgSF CAM signaling and tight junctions), **translational machinery** (ribosome), and **core intracellular metabolic processes** (branched‑chain amino acid and propanoate metabolism). The presence of disease‑named KEGG categories reflects enrichment of **broad intracellular regulatory and housekeeping gene sets**, rather than disease‑specific biology.
+
+Tier 2 defines the molecular basis of transcriptional divergence between South and West populations.
+Enrichment of cytoplasmic and intracellular GO terms together with KEGG pathways associated with translation and core metabolism indicates that population divergence is expressed at the level of fundamental intracellular and biosynthetic processes.  
+The co‑enrichment of protein‑binding and intracellular regulatory GO terms alongside KEGG pathways related to cell–cell interactions and cellular interfaces (IgSF CAM signaling and tight junctions) highlights divergence in regulatory and interaction‑level organization between populations.  
+Together, the coordinated enrichment of intracellular structural, regulatory, translational, and metabolic pathways indicates that population‑specific transcriptional divergence reflects system‑wide differences in cellular functional organization and regulation.
+
+
+## Tier 2b – Population‑Specific Temperature Response
+
+- **Total genes:** 45  
+- **Genes with orthologs:** 26  
+
+### GO enrichment:
+- Protein–RNA adaptor activity  
+- Endoplasmic reticulum  
+
+Functional enrichment analysis of Tier 2b, based on the 26 genes with identifiable orthologs, revealed a limited number of enriched GO terms. Enrichment for endoplasmic reticulum localization (8 genes) indicates a shared intracellular context among a subset of genes, while protein–RNA adaptor activity (2 genes) highlights a small group with regulatory roles. Given the reduced size of this gene set, these enrichments should be interpreted as exploratory, reflecting functional associations restricted to specific gene subsets rather than coordinated biological programs spanning the entire tier.
+
+### KEGG enrichment:
+- No KEGG pathways significantly enriched  
+
+No KEGG pathways were significantly enriched for Tier 2b, consistent with the limited size of the ortholog‑mapped gene set and the resulting low statistical power for pathway‑level enrichment analysis.
+
+Tier 2b represents a small subset of population‑divergent genes exhibiting origin‑specific temperature responses. Functional enrichment at this scale indicates fine‑grained cellular and regulatory associations, but does not support inference of shared pathways or system‑level organization. Accordingly, Tier 2b highlights candidate genes for population‑specific temperature responsiveness whose functional signal is evident only at a fine scale.
+
+
+## Tier 3 – Hybrid Misexpression
+
+### Misexpressed genes at 12°C
+
+- **Total genes:** 277  
+- **Genes with orthologs:** 172  
+
+#### GO enrichment
+- Cytoplasm and cytosolic components  
+- Endomembrane system and vesicle‑mediated trafficking, including extracellular vesicles and exosomes  
+- Nucleotide, ATP, and heterocyclic compound binding  
+- Cytoskeletal structures and cell projections  
+- Intracellular signaling and transport processes  
+
+GO enrichment of misexpressed genes at 12°C reveals extensive involvement of intracellular compartments and organizational structures, including cytoplasm, cytosol, endomembrane components, vesicles, and extracellular vesicles. In addition, enrichment of nucleotide‑, ATP‑, and heterocyclic compound‑binding molecular functions together with catalytic activity highlights widespread involvement of energy‑dependent molecular processes among misexpressed genes. Enrichment of cytoskeletal structures and cell‑projection–related terms further indicates altered cellular architecture and transport capacity in hybrids at this temperature.
+
+#### KEGG enrichment
+- Histidine metabolism  
+- Glycine, serine and threonine metabolism  
+- Motor proteins  
+- Pathogenic Escherichia coli infection  
+- Yersinia infection  
+
+KEGG pathway enrichment identifies histidine metabolism and glycine, serine and threonine metabolism, together with enrichment of the motor proteins pathway. Infection‑associated KEGG categories (Escherichia coli and Yersinia infection) are also returned, reflecting enrichment of broad, conserved cellular machinery commonly annotated within disease‑labeled pathways rather than pathogen‑specific biological processes.
+
+Hybrid misexpression at 12 °C is characterized by disruption of multiple fundamental cellular systems. Convergence between cytoplasmic GO categories and KEGG enrichment for amino‑acid metabolism indicates involvement of intracellular processes including core metabolic functions. In parallel, overlap between endomembrane‑ and vesicle‑associated GO terms and KEGG enrichment for motor proteins highlights altered intracellular transport and cytoskeletal dynamics in hybrids at this temperature. Together, these convergent signals indicate that hybrid misexpression at 12 °C affects multiple foundational cellular systems, rather than concentrating in a single regulatory or signaling pathway.
+
+
+### Misexpressed genes at 15°C
+
+- **Total genes:** 271  
+- **Genes with orthologs:** 175  
+
+#### GO enrichment
+- Cytoplasm and cytosolic components  
+- Intracellular organelles, membranes, and endomembrane organization  
+- Metabolic processes, including nucleotide and sulfur‑related pathways  
+- Protein binding, catalytic activity, and biochemical regulation  
+- Regulation of signaling, signal transduction, and response to stimuli  
+- Cytoskeletal structures, cell junctions, and cellular organization  
+
+GO enrichment of misexpressed genes at 15°C indicates extensive involvement of intracellular organization and compartmentalized cellular functions, including cytoplasmic, organellar, and membrane‑associated components. Enrichment of metabolic, nucleotide, and sulfur‑related processes together with catalytic activity highlights widespread engagement of biochemical pathways. In addition, enrichment of signaling and stimulus‑response terms reflects altered regulatory dynamics, while cytoskeletal and junction‑associated terms indicate changes in cellular structure and organization in hybrids at this temperature.
+
+#### KEGG enrichment
+- Focal adhesion  
+- Sulfur metabolism  
+- Cysteine and methionine metabolism  
+
+KEGG pathway enrichment identifies cell–matrix interaction processes through focal adhesion, together with sulfur‑related and amino‑acid metabolic pathways, including cysteine and methionine metabolism.
+
+Hybrid misexpression at 15°C is characterized by coordinated disruption of structural and metabolic cellular systems. Convergence between cytoskeletal and junction‑associated GO terms and KEGG enrichment for focal adhesion indicates altered cell–matrix interactions and cellular organization. In parallel, enrichment of metabolic GO categories together with sulfur and amino‑acid metabolism pathways highlights changes in biochemical and redox‑related processes. Together, these convergent signals indicate that hybrid misexpression at 15°C affects multiple interconnected cellular systems, including structure, metabolism, and regulation.
+
+
+### Misexpressed genes at 18°C
+
+- **Total genes:** 288  
+- **Genes with orthologs:** 197  
+
+#### GO enrichment
+- Cytoplasm and cytosolic components  
+- Nucleotide, ATP, and heterocyclic compound binding  
+- Protein binding and catalytic activity  
+- Vesicle‑related and extracellular compartment components  
+- Cytoskeletal structures and actin‑related processes  
+- Response to stimulus and stress‑related processes  
+
+GO enrichment of misexpressed genes at 18°C indicates widespread involvement of intracellular compartments and general molecular functions, including cytoplasmic localization, binding activities, and catalytic processes. Enrichment of cytoskeletal and vesicle‑associated terms suggests continued involvement of cellular structure and transport systems, while response‑to‑stimulus categories indicate broadly distributed regulatory activity. However, these enrichments are largely general and do not resolve into clearly defined functional pathways, consistent with the absence of significant KEGG pathway enrichment at this temperature.
+
+#### KEGG enrichment
+- No KEGG pathways were significantly enriched.
+
+Hybrid misexpression at 18°C is characterized by a lack of coherent pathway‑level organization. While GO enrichment indicates widespread involvement of intracellular structure, molecular binding, and regulatory processes, the absence of KEGG pathway enrichment suggests that misexpression at this temperature does not converge on distinct biological pathways. Instead, the observed patterns indicate diffuse and heterogeneous transcriptional disruption across multiple cellular functions.
+
+
+### Misexpressed genes (merged across temperatures)
+
+- **Total genes:** 727  
+- **Genes with orthologs:** 489  
+
+#### GO enrichment
+- Cytoplasm and intracellular compartments, including vesicles and endomembrane systems  
+- Nucleotide and ATP binding  
+- Metabolic processes, including amino‑acid and sulfur‑related pathways  
+- Cytoskeletal structures, actin‑based processes, and cellular organization  
+- Regulation of signaling, signal transduction, and response to stimuli  
+
+GO enrichment of misexpressed genes across temperatures reveals extensive involvement of intracellular compartments and molecular functions, including cytoplasmic, vesicle‑associated, and membrane‑bounded processes. Enrichment of binding and catalytic terms indicates widespread biochemical activity, while metabolic categories highlight involvement of amino‑acid and sulfur‑related pathways. Cytoskeletal and actin‑related terms further indicate changes in structural organization and intracellular transport systems. In addition, signaling and response‑related categories reflect broadly distributed regulatory processes across conditions.
+
+#### KEGG enrichment
+- Motor proteins  
+- Cytoskeleton in muscle cells  
+- Nucleocytoplasmic transport  
+- Histidine metabolism  
+- Cysteine and methionine metabolism  
+- Arginine and proline metabolism  
+- Pathogenic *Escherichia coli* infection  
+- *Salmonella* infection  
+
+KEGG pathway enrichment identifies both structural and metabolic pathway classes, including cytoskeletal transport systems (motor proteins and cytoskeleton‑related pathways) and amino‑acid metabolic processes. Infection‑associated KEGG categories (*Escherichia coli* and *Salmonella* infection) were also identified in the enrichment analysis, reflecting enrichment of broadly conserved cellular machinery commonly annotated within disease‑labeled pathways rather than pathogen‑specific biological processes.
+
+Hybrid misexpression across temperatures is characterized by disruption of multiple fundamental cellular systems. Convergence between intracellular organization and metabolic GO categories and KEGG enrichment for amino‑acid metabolism indicates involvement of core metabolic processes. In parallel, cytoskeletal and transport‑related GO terms align with KEGG enrichment for motor proteins and nucleocytoplasmic transport, highlighting altered intracellular organization. Together, these results indicate that hybrid misexpression across temperatures affects multiple foundational cellular systems underlying cellular organization and function, encompassing metabolic processes, structural organization, and associated regulatory responses.
+
+
+### Tier 1 ∩ Tier 3 misexpressed – Conserved temperature‑response genes misexpressed in hybrids
+
+- **Total genes:** 23  
+- **Genes with orthologs:** 18  
+
+#### GO enrichment
+- Catalytic activity  
+- Enzyme‑specific metabolic activities (including cysteine, methionine, and homocysteine metabolism)  
+- Binding and biochemical functions (heterocyclic compound binding, nucleotide‑related activity)  
+- ATP‑dependent enzymatic activity  
+
+GO enrichment highlights enzyme‑driven biochemical functions, including catalytic activity and multiple enzyme‑specific terms associated with amino‑acid metabolism, particularly cysteine, methionine, and homocysteine‑related processes. Enrichment of nucleotide‑associated and ATP‑dependent functions further indicates involvement of energy‑dependent biochemical activity.
+
+#### KEGG enrichment
+- Biosynthesis of amino acids  
+- Glycine, serine and threonine metabolism  
+- Cysteine and methionine metabolism  
+- Selenocompound metabolism  
+- One‑carbon pool by folate  
+
+KEGG pathway enrichment identifies amino‑acid metabolic pathways, including biosynthesis of amino acids and glycine, serine and threonine metabolism. Enrichment is also observed for sulfur‑associated metabolic pathways, including cysteine and methionine metabolism, selenocompound metabolism, and one‑carbon metabolism.
+
+Convergence between GO and KEGG enrichment results indicates that hybrid misexpression includes genes belonging to temperature‑responsive amino‑acid metabolic pathways and specifically affects sulfur‑associated processes linked to redox regulation. Given the limited size of the intersection, these results should be interpreted as exploratory; however, they support that hybrids misexpress a subset of genes associated with the metabolic component of the conserved temperature‑responsive gene set.
+
+
+### Tier 2b ∩ Tier 3 misexpressed
+
+The Tier 2b ∩ Tier 3 misexpressed gene intersection yielded a single well‑annotated gene corresponding to a CD81‑like tetraspanin, a membrane‑associated protein involved in cellular signaling and membrane organization. The presence of a single overlapping gene does not allow for functional enrichment or inference of a coherent pattern of hybrid misexpression in population‑specific temperature‑responsive genes.
+
+
+
+## Tier 3 – South Parental Inheritance
+
+### South Parental Inheritance at 12°C
+
+- **Total genes:** 410  
+- **Genes with orthologs:** 257  
+
+#### GO enrichment
+- Cytoplasm and cytosol  
+- Membrane and plasma membrane components  
+- Vesicles and extracellular vesicles (exosomes)  
+- Endomembrane system and intracellular compartments  
+- Neuronal structures (axon, dendrite, neuron projection)  
+- Cytoskeletal and cell projection components  
+- Intracellular transport and localization processes  
+- Regulation of signaling and cell communication  
+- Response to stimulus  
+
+#### KEGG enrichment
+- No KEGG pathways were significantly enriched
+
+GO enrichment of genes showing South parental inheritance at 12°C indicates broad involvement of intracellular and membrane‑associated cellular components, including cytoplasm, plasma membrane, vesicles, and endomembrane systems. Enrichment of neuronal and cell‑projection–related terms highlights representation of specialized cellular structures, while transport, localization, and signaling categories indicate active intracellular trafficking and regulatory processes. Together, these results suggest that South parental inheritance at this temperature is broadly associated with cellular organization and membrane‑associated processes, including transport and signaling, rather than clearly defined biological pathways.
+
+
+### South Parental Inheritance at 15°C
+
+- **Total genes:** 234  
+- **Genes with orthologs:** 153  
+
+#### GO enrichment
+- Cytoplasm and cytosol  
+- Protein binding and general binding functions  
+- Catabolic processes (organic acid and small molecule metabolism)  
+- Phospholipid and lipid binding (including phosphatidylinositol binding)  
+- Enzyme regulator and activator activity  
+- Intracellular signal transduction  
+- Transport processes  
+
+#### KEGG enrichment
+- No KEGG pathways were significantly enriched  
+
+GO enrichment of genes showing South parental inheritance at 15°C indicates broad involvement of intracellular compartments and molecular functions, including cytoplasm and cytosol. Enrichment of catabolic and metabolic processes highlights representation of biochemical turnover, while lipid and phospholipid binding terms, including phosphatidylinositol binding, indicate involvement of membrane‑associated signaling processes. In addition, enrichment of intracellular signal transduction and regulatory activity reflects involvement of signaling and regulatory cellular functions. Together, these results suggest that South parental inheritance at this temperature is broadly associated with metabolic processes and membrane‑associated signaling processes, reflecting biochemical and regulatory functions.
+
+
+### South Parental Inheritance at 18°C
+
+- **Total genes:** 448  
+- **Genes with orthologs:** 316  
+
+#### GO enrichment
+- Cytoplasm and cytosol  
+- Membrane, plasma membrane, and organelle membranes  
+- Vesicles, extracellular vesicles, and endomembrane system  
+- Cytoskeleton, actin filaments, and structural components  
+- Cell junctions and adhesion structures  
+- Neuronal and synaptic structures (axon, synapse, projections)  
+- Intracellular signaling, cell communication, and response to stimulus  
+- Metabolic and regulatory processes  
+
+GO enrichment of genes showing South parental inheritance at 18°C indicates extensive involvement of intracellular compartments together with membrane‑associated systems, including cytoplasm, vesicles, and endomembrane structures. Enrichment of cytoskeletal and junction‑related terms highlights strong representation of structural organization and cellular connectivity. In addition, neuronal and synaptic categories indicate involvement of specialized communication‑related cellular structures, while signaling and response‑to‑stimulus terms reflect broad regulatory and signaling processes.
+
+#### KEGG enrichment
+- Cytoskeleton in muscle cells  
+- Motor proteins  
+- Tight junction  
+- Integrin signaling  
+- Regulation of actin cytoskeleton  
+- PI3K‑Akt signaling pathway  
+- Pathogenic *Escherichia coli* infection  
+- *Salmonella* infection  
+- Cardio‑related pathways (hypertrophic, dilated, arrhythmogenic cardiomyopathy)  
+
+KEGG pathway enrichment identifies structural and signaling‑related pathways, including cytoskeletal organization, motor protein activity, and cell‑junction interactions such as tight junctions and focal adhesion. Signaling pathways such as PI3K‑Akt are also represented. Infection‑associated KEGG categories reflect enrichment of broadly conserved cellular machinery commonly annotated within disease‑labeled pathways rather than pathogen‑specific biological processes.
+
+Convergence between intracellular and membrane‑associated GO categories and KEGG enrichment for cytoskeletal and junction‑related pathways indicates involvement of cellular organization and structural dynamics. The presence of neuronal and synaptic GO terms further highlights specialized communication‑related structures, while enrichment of signaling‑related GO categories together with KEGG signaling pathways indicates involvement of regulatory cellular functions. Together, these results suggest that South parental inheritance at this temperature is broadly associated with cytoskeletal organization, membrane‑associated processes, and signaling functions, reflecting structured cellular organization supported by pathway‑level enrichment.
+
+
+### South Parental Inheritance (merged across temperatures)
+
+- **Total genes:** 936  
+- **Genes with orthologs:** 651  
+
+#### GO enrichment
+- Cytoplasm and cytosol  
+- Membrane, plasma membrane, and vesicle systems  
+- Endomembrane system and intracellular compartments  
+- Cytoskeleton, actin organization, and structural components  
+- Cell junctions, adhesion, and cell projections  
+- Neuronal and synaptic structures (axon, synapse, projections)  
+- Transport and localization processes  
+- Intracellular signaling, communication, and response to stimulus  
+- Metabolic and regulatory processes  
+
+GO enrichment of genes showing South parental inheritance indicates extensive involvement of intracellular compartments together with membrane‑associated systems, including cytoplasm, vesicles, and endomembrane structures. Enrichment of cytoskeletal structures, junctions, and cell‑projection terms highlights strong representation of structural organization and cellular connectivity. In addition, neuronal and synaptic categories indicate involvement of specialized communication‑related structures, while transport, signaling, and response‑related categories reflect broad regulatory cellular processes.
+
+#### KEGG enrichment
+- Cytoskeleton in muscle cells  
+- IgSF CAM signaling  
+- Rap1 signaling pathway  
+- Proteoglycans in cancer  
+- Protein digestion and absorption  
+- Pathogenic *Escherichia coli* infection  
+- *Salmonella* infection  
+- HIV‑1 infection  
+- Fluid shear stress and atherosclerosis  
+
+KEGG pathway enrichment identifies cytoskeletal organization and cell‑adhesion signaling pathways, including cytoskeleton‑related processes, Rap1 signaling, and IgSF CAM interactions, together with membrane‑associated cellular interactions. Infection‑related KEGG pathways reflect enrichment of broadly conserved cellular machinery rather than pathogen‑specific biological processes.
+
+Together, these results indicate that genes showing South parental inheritance are enriched for cellular systems involved in intracellular organization, cytoskeletal structure, membrane dynamics, and signaling processes. These patterns suggest that hybrid gene expression reflects functional contributions from the South parental background, particularly in structural and signaling‑related cellular functions.
+
+
+### Tier 1 ∩ Tier 3 – South parental inheritance
+
+- **Total genes:** 37  
+- **Genes with orthologs:** 32  
+
+#### GO enrichment
+- Extracellular matrix and structural components (collagen, basement membrane)  
+- Extracellular region and external structures  
+- Endoplasmic reticulum and vesicle‑associated compartments  
+- Structural molecule activity and binding functions  
+
+GO enrichment of genes within the Tier 1 ∩ Tier 3 South parental inheritance set highlights a subset of conserved temperature‑responsive genes associated primarily with extracellular and structural components, particularly extracellular matrix–related terms such as collagen and basement membrane. Enrichment of endoplasmic reticulum and vesicle‑associated categories indicates involvement of protein processing and secretion, while structural molecule activity and binding functions reflect roles associated with extracellular structural proteins.
+
+#### KEGG enrichment
+- No KEGG pathways were significantly enriched  
+
+These results indicate that hybrids inherit South‑like expression patterns for a structural component of the conserved temperature‑response system, particularly involving extracellular matrix and protein secretion–related functions.
+
+
+### Tier 2b ∩ Tier 3 – South parental inheritance
+
+The Tier2b ∩ Tier3_parent_S intersection comprises only three genes, two of which are functionally annotated. The annotated genes include a transmembrane protein belonging to the TM6 superfamily, supported by transmembrane domain predictions and near-complete genome coverage, and a protein containing a von Willebrand factor C domain, associated with extracellular protein interactions. In contrast, the von Willebrand factor C domain-containing gene shows lower genome coverage (~31%), indicating that the genome annotation is only partially reconstructed compared to the Trinity transcript, despite consistent domain and homology-based annotation.  
+
+The remaining gene lacks detectable functional annotation despite passing ORF quality filtering, indicating a coding sequence with currently unresolved function.  
+
+These observations indicate that hybrids exhibit South-like expression patterns for genes associated with membrane-related and extracellular interaction processes within this small subset of population-specific temperature-response genes.
+
+
+## Tier 3 – West Parental Inheritance
+
+### West Parental Inheritance 12°C
+
+**Total genes:** 466
+**Genes with orthologs:** 283  
+
+#### GO enrichment
+
+- Intracellular transport and localization processes (transport, localization, intracellular transport, vesicle-mediated transport)  
+- Vesicle and endomembrane system components (vesicle, intracellular vesicle, endosome membrane, vesicle membrane)  
+- Cytoplasm and membrane-associated compartments (cytoplasm, membrane, cytosol, organelle membrane)  
+- Cytoskeletal and structural organization terms (cytoskeleton, microtubule, cell projection, cytoskeleton organization)  
+- Synapse and neuron projection-related categories (synapse, presynapse, neuron projection, axon, dendrite)  
+- Supporting processes including homeostasis, regulation, and metabolic processes  
+
+Gene Ontology enrichment of genes within the West parental inheritance set at 12°C highlights a large subset of genes associated primarily with intracellular transport, localization, and cellular organization. Prominent enrichment of vesicle and endomembrane system components indicates a central role for vesicle-mediated trafficking and membrane-associated processes. Enrichment of cytoskeletal terms further supports the involvement of structural organization underlying intracellular transport and cellular dynamics.  
+
+Synapse- and neuron-related terms are also enriched, but these likely reflect conserved components of vesicle transport and signaling machinery rather than tissue-specific neuronal functions.  
+
+#### KEGG enrichment
+
+- Cytoskeleton in muscle cells  
+
+KEGG pathway enrichment highlights cytoskeletal organization as a significant feature of this gene set, reinforcing the importance of structural and transport-related cellular systems.  
+
+These results indicate that hybrids exhibit West-like expression patterns at 12°C for genes involved in intracellular transport, membrane dynamics, and cellular organization. This profile reflects coordinated regulation of core cellular systems required for maintaining intracellular organization and transport under low-temperature conditions, rather than specialized or stress-specific pathways.
+
+
+### West Parental Inheritance 15°C
+
+**Total genes:** 1259  
+**Genes with orthologs:** 895  
+
+#### GO enrichment
+
+- Intracellular transport and localization processes (transport, localization, intracellular transport, vesicle-mediated transport, protein transport)  
+- Vesicle and endomembrane system components (vesicle, intracellular vesicle, endoplasmic reticulum, Golgi apparatus, vesicle membrane)  
+- Cytoplasm, cytosol, and membrane-associated compartments (cytoplasm, cytosol, membrane, organelle, membrane-bounded organelle)  
+- Cytoskeletal and structural organization terms (cytoskeleton, microtubule cytoskeleton, cytoskeleton organization, actin-based processes, cell projection)  
+- Protein metabolism and modification processes (protein metabolic process, macromolecule modification, catalytic activity)  
+- Signaling and regulatory processes (signal transduction, regulation of cellular process, response to stimulus, intracellular signaling)  
+- Synapse and neuron projection-related categories (synapse, neuron projection, axon, dendrite)  
+- Developmental and cellular organization processes (developmental process, organelle organization, cellular component organization)  
+
+Gene Ontology enrichment of genes within the West parental inheritance set at 15°C includes terms associated with intracellular transport and localization, vesicle and endomembrane system components, and cytoskeletal organization.  
+
+Protein metabolic and modification processes are also represented, reflecting the presence of enzymatic and protein turnover-related functions. Signaling and regulatory categories, alongside synapse- and neuron-related terms, indicate the presence of intracellular signaling and communication systems.  
+
+#### KEGG enrichment
+
+- Phosphatidylinositol signaling system  
+- Inositol phosphate metabolism  
+- mRNA surveillance pathway  
+- Insulin signaling pathway  
+- Insulin resistance  
+- Nucleocytoplasmic transport  
+- Focal adhesion  
+- Ubiquitin-mediated proteolysis  
+- Regulation of actin cytoskeleton  
+- cAMP signaling pathway  
+
+KEGG pathway enrichment includes intracellular signaling pathways, RNA processing and protein turnover pathways, intracellular transport systems, and cytoskeletal and adhesion pathways.  
+
+
+At 15°C, the West-like gene set expands substantially, reflecting a strong increase in the number of genes inherited in a West-like expression pattern. This expansion likely contributes to the broader functional diversity observed at this temperature.  
+
+Compared to 12°C, enrichment at 15°C includes not only intracellular transport and cellular organization but also an increased representation of signaling, protein metabolism, and regulatory processes. Pathways such as insulin signaling, phosphatidylinositol signaling, and mRNA surveillance further indicate enhanced coordination of intracellular signaling and protein regulation.  
+
+This shift suggests that the functional profile begins to include processes associated with cellular regulation and response to environmental change. These patterns indicate that West populations at intermediate temperature exhibit increased engagement of regulatory functions, which may precede the activation of more pronounced stress-response systems observed at higher temperatures.
+
+
+### West Parental Inheritance 18°C
+
+**Total genes:** 2188  
+**Genes with orthologs:** 1545  
+
+#### GO enrichment
+
+- Intracellular transport and localization processes (transport, localization, intracellular transport, vesicle-mediated transport, protein transport)  
+- Vesicle, endomembrane system, and ER-associated components (endomembrane system, vesicle, intracellular vesicle, endoplasmic reticulum, ER membrane)  
+- Cytoplasm, cytosol, and membrane-associated compartments (cytoplasm, cytosol, membrane, organelle, membrane-bounded organelle)  
+- Cytoskeletal and structural organization terms (cytoskeleton, microtubule cytoskeleton, cytoskeleton organization, actin-based processes)  
+- Protein metabolism and catabolic processes (protein metabolic process, catabolic process, protein modification, ubiquitin-related processes)  
+- Signaling and regulatory processes (signal transduction, regulation of cellular process, response to stimulus)  
+- Extracellular vesicle and secretion-related categories (extracellular vesicle, exosome, extracellular region)  
+- Stress-related processes (response to stress, cellular response to stress, autophagy-related terms)  
+
+Gene Ontology enrichment of genes within the West parental inheritance set at 18°C includes a wide range of cellular systems, comprising intracellular transport and localization processes, vesicle and endomembrane system components with strong representation of endoplasmic reticulum-associated functions, and cytoplasmic and membrane-associated compartments.  
+
+Cytoskeletal and structural organization terms are also present, alongside protein metabolic and catabolic processes and signaling and regulatory categories. In addition, extracellular vesicle and secretion-related terms and multiple stress-related categories are represented within the enriched functional groups.  
+
+#### KEGG enrichment
+
+- Spinocerebellar ataxia  
+- Cytoskeleton in muscle cells  
+- Insulin signaling pathway  
+- Protein digestion and absorption  
+- Protein processing in endoplasmic reticulum  
+- Autophagy - animal  
+- Cell cycle  
+- Tight junction  
+- mRNA surveillance pathway  
+- p53 signaling pathway  
+- Steroid biosynthesis  
+- Fc gamma R-mediated phagosome formation  
+- Arginine and proline metabolism  
+- Nicotinate and nicotinamide metabolism  
+- Pathways of neurodegeneration - multiple diseases  
+- Focal adhesion  
+- Proteoglycans in cancer  
+- Insulin resistance  
+- Amyotrophic lateral sclerosis  
+
+KEGG pathway enrichment includes pathways associated with intracellular transport and RNA regulation, protein processing and degradation systems such as endoplasmic reticulum-associated processing and autophagy, and cytoskeletal and adhesion pathways.  
+
+Additional pathways include ubiquitin-mediated proteolysis and signaling pathways such as insulin signaling and p53 signaling. Disease-associated pathways (e.g. neurodegeneration) are also enriched and reflect conserved molecular mechanisms associated with protein homeostasis and cellular stress responses.  
+
+
+At 18°C, the number of genes exhibiting West-like inheritance increases further, indicating a continued temperature-dependent shift toward expression patterns characteristic of the West population. This expanded gene set is associated with a broad range of cellular functions, including intracellular transport and cellular organization, structural components, protein metabolism, and signaling processes.  
+
+Compared to 15°C, enrichment at 18°C shows stronger representation of protein processing and degradation pathways, including endoplasmic reticulum-associated processes and ubiquitin-mediated systems. The presence of signaling pathways such as insulin and p53 signaling, together with increased representation of vesicle-associated and extracellular communication systems, indicates expanded coordination of intracellular regulation and intercellular interactions.  
+
+In addition, enrichment of stress-related categories, including response to stress and cellular response to stress, together with pathways associated with autophagy and protein quality control, indicates substantial engagement of cellular stress-response systems.  
+
+Together, these results demonstrate that not only do West populations exhibit stress-associated responses at higher temperatures, but hybrids also inherit this stress-related component of the transcriptomic response. These patterns indicate a temperature-dependent shift toward functional profiles associated with cellular stress responses, including protein quality control, metabolic regulation, and stress-related signaling pathways, which become clearly pronounced at 18°C.
+
+### West Parental Inheritance (merged across temperatures)
+
+- **Total genes:** 3067  
+- **Genes with orthologs:** 2320  
+
+#### GO enrichment
+
+- Cytoplasm and cytosol  
+- Membrane, plasma membrane, and vesicle systems  
+- Endomembrane system and intracellular compartments  
+- Cytoskeleton, actin organization, and structural components  
+- Cell junctions, adhesion, and cell projections  
+- Extracellular vesicles and exosomes  
+- Transport and localization processes  
+- Intracellular signaling and regulatory processes  
+- Protein metabolism, modification, and catabolic processes  
+- Cell cycle and cellular turnover  
+- Stress-related processes (including response to stress, oxidative stress, and ER-related processes)  
+
+Gene Ontology enrichment of genes showing West parental inheritance indicates broad involvement of cellular systems associated with intracellular organization and membrane-associated compartments, including cytoplasm, vesicles, and endomembrane structures.  
+Enrichment of cytoskeletal structures, cell junctions, and projection-related terms highlights strong representation of structural organization and cellular connectivity. In addition, transport and localization categories indicate active intracellular trafficking processes, while signaling and regulatory terms reflect coordinated cellular control mechanisms.  
+Protein metabolic and catabolic processes, together with cell cycle–related categories, indicate involvement of protein turnover and cellular regulation. Stress-related terms are also represented within the dataset, reflecting inclusion of pathways associated with cellular stress and protein homeostasis.  
+
+#### KEGG enrichment
+
+- Cytoskeleton in muscle cells  
+- Spinocerebellar ataxia  
+- Insulin signaling pathway  
+- Protein processing in endoplasmic reticulum  
+- Arginine and proline metabolism  
+- Steroid biosynthesis  
+- Autophagy - animal  
+- mRNA surveillance pathway  
+- Integrin signaling  
+- Focal adhesion  
+- Insulin resistance  
+- Tight junction  
+- Nucleocytoplasmic transport  
+- Protein digestion and absorption  
+- Cell cycle  
+- AGE-RAGE signaling pathway  
+- Motor proteins  
+- Pathways of neurodegeneration - multiple diseases  
+- Amyotrophic lateral sclerosis  
+- AMPK signaling pathway  
+- Regulation of actin cytoskeleton  
+- Ferroptosis  
+- Proteoglycans in cancer  
+- Phosphatidylinositol signaling system  
+- Fc gamma R-mediated phagosome formation  
+- Ubiquitin mediated proteolysis  
+
+KEGG pathway enrichment identifies cytoskeletal organization and cell-adhesion pathways, intracellular transport and RNA-related processes, and protein processing and degradation systems such as endoplasmic reticulum processing, autophagy, and ubiquitin-mediated pathways.  
+In addition, signaling pathways and metabolic pathways are represented, indicating regulatory and metabolic cellular functions. Pathways associated with cellular stress and protein homeostasis, including neurodegeneration-related categories and ferroptosis, reflect enrichment of conserved mechanisms involved in stress-related cellular processes.  
+
+
+Together, these results indicate that genes showing West parental inheritance are enriched for a wide range of cellular systems, including cellular organization, intracellular transport, cytoskeletal structure, membrane dynamics, signaling, and metabolic processes.  
+The dataset also includes pathways related to protein processing, degradation, and stress-associated cellular functions. Overall, this merged profile reflects a broad repertoire of structural, regulatory, and stress-related processes contributing to West-like gene expression patterns.
+
+### Tier 1 ∩ Tier 3 – West Parental Inheritance
+
+**Total genes:** 146  
+**Genes with orthologs:** 121  
+
+#### GO enrichment
+
+- Cytoplasm and intracellular compartments (cytoplasm, cytosol, organelles)  
+- Extracellular space and vesicles (extracellular space, vesicle, exosome, secretory compartments)  
+- Endomembrane system and ER-related compartments (endomembrane system, ER, vesicle lumen)  
+- Cytoskeleton and structural components (cytoskeleton, microfibril, elastic fiber)  
+- Extracellular matrix (ECM) and adhesion-related components  
+- Development and morphogenesis (anatomical development, neurogenesis, tissue development)  
+- Signaling and response processes (response to stimulus, hormone response, signaling)  
+- Metabolic processes (amino acid metabolism, small molecule metabolism)  
+- Stress and autophagy-related processes (response to stress, autophagy regulation)  
+
+Gene Ontology enrichment of genes within the Tier 1 ∩ Tier 3 West parental inheritance set highlights involvement of intracellular and extracellular organization, including cytoplasmic compartments, vesicle-mediated processes, and extracellular matrix–related functions.  
+
+Structural organization and developmental processes are also represented, together with signaling and response categories. In addition, metabolic processes and stress‑ and autophagy‑related functions are present within this subset.  
+
+#### KEGG enrichment
+
+- Alanine, aspartate and glutamate metabolism  
+- One carbon pool by folate  
+- Biosynthesis of amino acids  
+- Arginine biosynthesis  
+
+KEGG pathway enrichment identifies amino acid metabolism and biosynthetic pathways, indicating involvement in core metabolic processes within this gene set.  
+
+#### Integrated interpretation
+
+Out of the 593 core temperature‑responsive genes, 146 show West‑like expression in hybrids.  
+
+Within this subset, the presence of amino acid metabolic pathways indicates the involvement of metabolic functions alongside structural processes, consistent with the central role of metabolic reprogramming in thermal adaptation.  
+
+This shows that hybrids inherit West‑like expression for a larger proportion of these genes compared to South, specifically those involved in cytoplasmic organization, extracellular and extracellular matrix–related functions, and amino acid metabolic processes, which are key components of the cellular response to temperature.
+
+
+### Tier 2b ∩ Tier 3 – West Parental Inheritance
+
+**Total genes:** 33  
+**Genes with orthologs:** 20  
+
+#### GO enrichment
+
+- Protein–RNA adaptor and sequence‑specific interactions  
+- Enzymatic and metabolic activities (transferases, reductases, decarboxylases)  
+- Small molecule binding and enzyme regulator activity  
+
+Gene Ontology enrichment of genes within the Tier 2b ∩ Tier 3 West parental inheritance set identifies a limited number of significantly enriched molecular functions, primarily associated with RNA‑related interactions and enzymatic activities.  
+
+These functions reflect biochemical and regulatory processes at the molecular level rather than higher‑order cellular or pathway‑level organization.  
+
+#### KEGG enrichment
+
+No KEGG pathways were significantly enriched.  
+
+#### Integrated interpretation
+
+Out of the 45 Tier 2b genes, 33 show West‑like expression in hybrids, compared to only 3 showing South‑like expression.  
+
+Within this subset, enrichment is primarily detected at the level of molecular functions, including enzymatic activities and RNA‑associated interactions, indicating biochemical and regulatory processes.  
+
+These functions are consistent with mechanisms of thermal response and local adaptation, where enzymatic activities contribute to metabolic adjustment under temperature change and protein–RNA interactions modulate post‑transcriptional regulation, enabling fine control of gene expression in response to environmental variation.  
+
+Together, these results suggest that hybrids carry West‑like inheritance of biochemical and regulatory functions that may contribute to local thermal adaptation.
+
+# Session Info
+```{r session_info} 
+sessionInfo()
+```
+
+

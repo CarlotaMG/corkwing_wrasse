@@ -21,13 +21,11 @@ We applied Principal Component Analysis (PCA) to transcriptomic profiles of *Sym
 ## Setup and Libraries
 ```{r packages, results='hide'}
 
-# Load libraries 
 suppressPackageStartupMessages({
+  library(tidyverse)
   library(DESeq2)
-  library(ggplot2)
-  library(dplyr)
   library(ggrepel)
-	library(readxl)
+  library(readxl)
 })
 
 ```

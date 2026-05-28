@@ -16,18 +16,18 @@ knitr::opts_knit$set(
 
 # Differential Expression Analysis with additive model
 
-## Setup and Package Loading
+## Package Loading
 ```{r packages}
-# Load necessary packages
+
 suppressPackageStartupMessages({
   library(tidyverse)
   library(DESeq2)
   library(apeglm)
   library(ashr)
-  library(grid)
   library(VennDiagram)
   library(readxl)
 })
+  
 ```
 
 ## Data Import and Preprocessing
