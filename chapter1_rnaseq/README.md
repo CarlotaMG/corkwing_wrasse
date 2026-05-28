@@ -48,18 +48,12 @@ This chapter includes:
 1. **[Transcriptome Assembly](scripts/assembly/README.md)**
 
 2. **[Sample Clustering](scripts/sample_clustering/README.md)**
-   - [PCA Report](../docs/DE_reports/PCA.html)
 
 3. **[Differencial Expression](scripts/DE/README.md)**
-   - [Model Comparison Report](../docs/DE_reports/DE_model_comparison.html)
-   - [Tier 1 and 2 Report](../docs/DE_reports/Tier_1_2_DE.html)
-   - [Tier 3 Report](../docs/DE_reports/tier3_DE.html)
 
 4. **[Annotation](scripts/annotation/README.md)**
-   - [Comparison of annotation sources Report](../docs/chapter1_rnaseq/annotations.html)
 
 5. **[Functional Enrichment README](scripts/functional_enrichment/README.md)**
-   - [Enrichment Report](../docs/functional_enrichment.html)
 
 ---
 
@@ -74,7 +68,7 @@ This design reflects the actual workflow used during analysis and supports repro
 - **Containers**: Trinity(assembly) and Trinotate(annotation) were run inside Singularity/Apptainer containers for reproducibility.  
 - **Modules**: FastQC, MultiQC, STAR, SAMtools, BUSCO, HMMER, BLAST+, InterProScan, and others were loaded as environment modules.  
 - **Special tools**: SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were integrated into annotation workflows.
-- **R-based analyses**: All downstream analyses following assembly and annotation were conducted in R using RMarkdown workflows, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
+- **R-based analyses**: All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
 
 Details of container setup, module usage, external data resources and R sessions are documented in each section README. 
 
