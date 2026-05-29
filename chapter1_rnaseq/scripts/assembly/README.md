@@ -136,7 +136,6 @@ bash scripts/assembly/preprocessing/multiQC.sh \
 results/assembly/preprocessing/fastaQC/trimmed \
 results/assembly/preprocessing/multiQC/trimmed
 ```
-⸺
 #### Slurm array job example
 ```bash
 R1_FILES=(data/raw_fastq/*_R1.fastq.gz)
@@ -160,15 +159,15 @@ Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the
 
 Builds a STAR genome index from the reference genome. This index is required for mapping reads with STAR.
 
-##### Inputs
+#### Inputs
 - Reference genome FASTA file
-##### Outputs
+#### Outputs
 - STAR genome index files
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/mapping/indexing.sh <genome_fasta> <output_dir>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/mapping/indexing.sh resources/ref_genome.fasta results/assembly/mapping/indexing
 ```
@@ -178,16 +177,16 @@ bash scripts/assembly/mapping/indexing.sh resources/ref_genome.fasta results/ass
 
 Maps trimmed paired-end reads to the reference genome using STAR. This script loops through all samples in the input directory and produces sorted BAM files for each.
 
-##### Inputs
+#### Inputs
 - STAR genome index directory
 - Trimmed paired-end FASTQ files (*_R1_paired.fastq.gz, *_R2_paired.fastq.gz)
-##### Outputs
+#### Outputs
 - Sorted BAM files for each sample
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/mapping/mapping.sh <index_dir> <trimmed_dir> <output_dir>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/mapping/mapping.sh \
 results/assembly/mapping/indexing data/trimmed_fastq \
@@ -199,38 +198,39 @@ results/assembly/mapping
 
 Merges all individual BAM files from the mapping step into a single file for use in guided de novo Trinity assembly.
 
-##### Inputs
+#### Inputs
 - Directory containing sorted BAM files
-##### Outputs
+#### Outputs
 - Merged BAM file (combined_for_assembly.bam)
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/mapping/concatBAM.sh <bam_dir> <output_bam>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/mapping/concatBAM.sh \
 results/assembly/mapping \
 results/assembly/mapping/combined_for_assembly.bam
 ```
-⸺
 
-#### Run Trinity Assembly:
+---
+
+### 3. Run Trinity Assembly
 
 [trinity_run.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/trinity/trinity_run.sh)
 
 Runs genome-guided de novo transcriptome assembly inside a Singularity container. The script takes a coordinate-sorted BAM file, a Singularity image, and an output directory as input.
 
-##### Inputs
+#### Inputs
 - Coordinate-sorted BAM file (combined_for_assembly.bam)
 - Singularity image (trinityrnaseq_latest.sif)
-##### Outputs
+#### Outputs
 - Assembled transcriptome (Trinity-GG.fasta) and associated files for quantification and annotation
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/trinity/trinity_run.sh <bam_file> <singularity_image> <output_dir>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/trinity/trinity_run.sh \
 results/mapping/combined_for_assembly.bam \
@@ -240,27 +240,27 @@ resources/trinityrnaseq_latest.sif results/assembly/trinity
 The Butterfly stage (--bflyHeapSpaceMax 10G) uses 10 GB per thread, multiplied by 16 threads (--bflyCPU 16), totaling 160 GB — consistent with the overall memory setting (--max_memory 160G).
 To accommodate this, the script was executed via a SLURM job with --cpus-per-task=16 and a slightly higher memory allocation (--mem=170G) to ensure stability and account for container-related overhead.
 
-⸺
+---
 
-#### Post-assembly Evaluation:
+## 4. Post-assembly Evaluation:
 
 [trinity_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/trinity_stats.sh)
 
 Generates basic statistics for the Trinity-assembled transcriptome using `TrinityStats.pl` inside a Singularity container. The script accepts three arguments: the Trinity FASTA file, the Singularity image, and the output file path.
 
-##### Inputs
+#### Inputs
 - Trinity-assembled transcriptome (Trinity-GG.fasta)
 - Singularity image (`trinityrnaseq_latest.sif`)
-##### Outputs
+#### Outputs
 - Trinity assembly statistics (`trinity_stats.txt`)
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
 <trinity_fasta> \
 <singularity_image> \
 <output_file>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/post_assembly/stats/trinity_stats.sh \
 results/assembly/trinity/Trinity-GG.fasta \
@@ -273,12 +273,12 @@ results/assembly/post_assembly/stats/trinity_stats.txt
 
 Assesses the completeness of the Trinity-assembled transcriptome using BUSCO. The script accepts three arguments: the input FASTA file, the name of a BUSCO lineage dataset, the output directory, and optionally the number of threads.
 
-##### Inputs
+#### Inputs
 - Trinity-assembled transcriptome (Trinity-GG.fasta)
 - BUSCO lineage dataset (e.g., actinopterygii_odb10)
-##### Outputs
+#### Outputs
 - Completeness metrics based on conserved orthologs, along with associated logs and intermediate files
-##### Usage
+#### Usage
 ```bash
 bash scripts/assembly/post_assembly/stats/busco_stats.sh \
 <input_fasta> \
@@ -286,7 +286,7 @@ bash scripts/assembly/post_assembly/stats/busco_stats.sh \
 <output_dir> \
 [num_threads]
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/assembly/post_assembly/stats/busco_stats.sh \
 results/assembly/trinity/Trinity-GG.fasta \
@@ -296,23 +296,23 @@ results/assembly/post_assembly/stats/busco \
 ```
 > **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 
-⸺
+---
 
-#### Post-assembly Quantification:
+## 5. Post-assembly Quantification:
 
 [estimate_abundance.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/estimate_abundance.sh)
 
 Estimates transcript abundance for a single sample using RSEM via Trinity utilities inside a Singularity container.
 The script takes six arguments: a left reads FASTQ file, a right reads FASTQ file, a Trinity-assembled transcriptome FASTA file, a Singularity image, an output directory, and a thread count. It is designed to be modular and is typically called within a SLURM array job to process multiple samples in parallel.
 
-##### Inputs
+#### Inputs
 - Left FASTQ file (`*_R1_paired.fastq.gz`)
 - Right FASTQ file (`*_R2_paired.fastq.gz`)
 - Trinity-assembled transcriptome FASTA file
-##### Outputs
+#### Outputs
 - RSEM output files in a sample-specific subdirectory
 - Log files (`.out`, `.err`)
-##### Usage
+#### Usage
 ```bash
 bash scripts/quantification/estimate_abundance.sh \
 <left_reads> \
@@ -322,7 +322,7 @@ bash scripts/quantification/estimate_abundance.sh \
 <output_dir> \
 <thread_count>
 ```
-##### SLURM array job example
+#### SLURM array job example
 ```bash
 R1_FILES=(data/trimmed_fastq/*_R1_paired.fastq.gz)
 R1_FILE=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
@@ -343,12 +343,12 @@ $SLURM_CPUS_PER_TASK
 
 Compiles gene- and isoform-level abundance matrices from RSEM output files.
 The script takes four arguments: a directory containing RSEM output files, a gene-to-transcript mapping file, a Singularity image, and an output directory.
-##### Inputs
+#### Inputs
 - RSEM directories (e.g., results/quantification/rsem/rsem_*)
 - Gene-to-transcript mapping file (e.g., results/assembly/trinity/Trinity-GG.fasta.gene_trans_map)
-##### Ouputs
+#### Ouputs
 - Gene- and isoform-level abundance matrices
-##### Usage
+#### Usage
 ```bash
 bash scripts/quantification/compile_abundance.sh \
 <rsem_dir> \
@@ -356,7 +356,7 @@ bash scripts/quantification/compile_abundance.sh \
 <singularity_image> \
 <output_dir>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/quantification/compile_abundance.sh results/quantification/rsem \
 results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
@@ -369,15 +369,15 @@ results/quantification/compiled
 
 Computes cumulative feature counts across samples.
 The script takes three arguments: a directory containing RSEM output files, a Singularity image, and an output directory.
-##### Inputs
+#### Inputs
 - RSEM directories (e.g., results/quantification/rsem/rsem_*)
-##### Ouputs
+#### Ouputs
 - Per-sample cumulative count files, and combined summary file (`cumul_counts_combined.txt`)
-##### Usage
+#### Usage
 ```bash
 bash scripts/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> <output_dir>
 ```
-##### Example
+#### Example
 ```bash
 bash scripts/quantification/cumulative_counts.sh \
 results/quantification \
