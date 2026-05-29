@@ -63,6 +63,7 @@ data/trimmed_fastq \
 results/assembly/preprocessing/fastaQC/trimmed \
 5
 ```
+
 ⸺
 
 [multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/multiQC.sh)
@@ -88,6 +89,7 @@ bash scripts/assembly/preprocessing/multiQC.sh \
 results/assembly/preprocessing/fastaQC/trimmed \
 results/assembly/preprocessing/multiQC/trimmed
 ```
+
 ⸺
 
 [trimming.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/trimming.sh)
@@ -149,7 +151,7 @@ resources/adapters/TruSeq3-PE.fa \
 $SLURM_CPUS_PER_TASK
 ```
 
-⸺
+---
 
 ## 2. Mapping
 Before running guided de novo Trinity assembly, RNA-seq reads are aligned to the reference genome to produce coordinate-sorted BAM files. Trinity uses these alignments to partition reads into genomic loci, which are then assembled independently using de novo methods. This approach improves transcript reconstruction by incorporating genomic context while maintaining the flexibility of de novo assembly, including the potential to recover novel or unannotated transcripts.
