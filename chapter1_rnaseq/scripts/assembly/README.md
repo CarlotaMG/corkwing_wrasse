@@ -34,7 +34,7 @@ Most output directories are created automatically by scripts; however, some base
 
 ---
 
-## 1. Preprocessing and quality control
+## 1. Preprocessing and Quality Control
 
 [fastQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/fastQC.sh)
 
@@ -46,19 +46,19 @@ Runs FastQC on FASTQ files to assess read quality. This script is parameterized 
 - FastQC reports (*.html, *.zip)
 #### Usage
 ```bash
-bash scripts/assembly/preprocessing/fastaQC.sh <input_dir> <output_dir> [threads]
+bash scripts/assembly/preprocessing/fastQC.sh <input_dir> <output_dir> [threads]
 ```
 #### Examples
 ```bash
-bash scripts/assembly/preprocessing/fastaQC.sh \
+bash scripts/assembly/preprocessing/fastQC.sh \
 data/raw_fastq \
-results/assembly/preprocessing/fastaQC/raw \
+results/assembly/preprocessing/fastQC/raw \
 5
 ```
 ```bash
-bash scripts/assembly/preprocessing/fastaQC.sh \
+bash scripts/assembly/preprocessing/fastQC.sh \
 data/trimmed_fastq \
-results/assembly/preprocessing/fastaQC/trimmed \
+results/assembly/preprocessing/fastQC/trimmed \
 5
 ```
 
@@ -79,12 +79,12 @@ bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
 #### Examples
 ```bash
 bash scripts/assembly/preprocessing/multiQC.sh \
-results/assembly/preprocessing/fastaQC/raw \
+results/assembly/preprocessing/fastQC/raw \
 results/assembly/preprocessing/multiQC/raw
 ```
 ```bash
 bash scripts/assembly/preprocessing/multiQC.sh \
-results/assembly/preprocessing/fastaQC/trimmed \
+results/assembly/preprocessing/fastQC/trimmed \
 results/assembly/preprocessing/multiQC/trimmed
 ```
 
@@ -111,28 +111,6 @@ bash scripts/assembly/preprocessing/trimming.sh \
 <output_dir> \
 <adapter_file> \
 <threads>
-```[multiQC.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/preprocessing/mult>
-
-Aggregates FastQC reports into a single summary using MultiQC. This script is designed to work with any directory conta>
-
-#### Inputs
-- Directory containing FastQC output files (*.zip, *.html)
-#### Outputs
-- MultiQC summary report (multiqc_report.html) and associated files
-#### Usage
-```bash
-bash scripts/assembly/preprocessing/multiQC.sh <input_dir> <output_dir>
-```
-#### Examples
-```bash
-bash scripts/assembly/preprocessing/multiQC.sh \
-results/assembly/preprocessing/fastaQC/raw \
-results/assembly/preprocessing/multiQC/raw
-```
-```bash
-bash scripts/assembly/preprocessing/multiQC.sh \
-results/assembly/preprocessing/fastaQC/trimmed \
-results/assembly/preprocessing/multiQC/trimmed
 ```
 #### Slurm array job example
 ```bash
@@ -213,7 +191,7 @@ results/assembly/mapping/combined_for_assembly.bam
 
 ---
 
-## 3. Run Trinity Assembly
+## 3. Trinity Assembly
 
 [trinity_run.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/trinity/trinity_run.sh)
 
@@ -240,7 +218,7 @@ To accommodate this, the script was executed via a SLURM job with --cpus-per-tas
 
 ---
 
-## 4. Post-assembly Evaluation:
+## 4. Post-assembly Evaluation
 
 [trinity_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/trinity_stats.sh)
 
@@ -292,11 +270,11 @@ actinopterygii_odb10 \
 results/assembly/post_assembly/stats/busco \
 5
 ```
-> **Note:**BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
+> **Note:** BUSCO writes auxiliary files to the current working directory regardless of --out_path. This script changes into the output directory before execution to ensure all files are contained and the project root remains clean.
 
 ---
 
-## 5. Post-assembly Quantification:
+## 5. Post-assembly Quantification
 
 [estimate_abundance.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/estimate_abundance.sh)
 
@@ -312,7 +290,7 @@ The script takes six arguments: a left reads FASTQ file, a right reads FASTQ fil
 - Log files (`.out`, `.err`)
 #### Usage
 ```bash
-bash scripts/quantification/estimate_abundance.sh \
+bash scripts/assembly/post_assembly/quantification/estimate_abundance.sh \
 <left_reads> \
 <right_reads> \
 <transcriptome_fasta> \
@@ -326,12 +304,12 @@ R1_FILES=(data/trimmed_fastq/*_R1_paired.fastq.gz)
 R1_FILE=${R1_FILES[$SLURM_ARRAY_TASK_ID]}
 R2_FILE=${R1_FILE/_R1_paired.fastq.gz/_R2_paired.fastq.gz}
 
-bash scripts/quantification/estimate_abundance.sh \
+bash scripts/assembly/post_assembly/quantification/estimate_abundance.sh \
 "$R1_FILE" \
 "$R2_FILE" \
 results/assembly/trinity/Trinity-GG.fasta \
 resources/containers/trinityrnaseq_latest.sif \
-results/quantification/rsem \
+results/assembly/trinity/abundance_estimation \
 $SLURM_CPUS_PER_TASK
 ```
 
@@ -342,13 +320,13 @@ $SLURM_CPUS_PER_TASK
 Compiles gene- and isoform-level abundance matrices from RSEM output files.
 The script takes four arguments: a directory containing RSEM output files, a gene-to-transcript mapping file, a Singularity image, and an output directory.
 #### Inputs
-- RSEM directories (e.g., results/quantification/rsem/rsem_*)
+- Per-sample RSEM output directories (e.g., `rsem_sample_*`) located in `results/assembly/trinity/abundance_estimation/`
 - Gene-to-transcript mapping file (e.g., results/assembly/trinity/Trinity-GG.fasta.gene_trans_map)
-#### Ouputs
+#### Outputs
 - Gene- and isoform-level abundance matrices
 #### Usage
 ```bash
-bash scripts/quantification/compile_abundance.sh \
+bash scripts/assembly/post_assembly/quantification/compile_abundance.sh \
 <rsem_dir> \
 <gene_trans_map> \
 <singularity_image> \
@@ -356,10 +334,11 @@ bash scripts/quantification/compile_abundance.sh \
 ```
 #### Example
 ```bash
-bash scripts/quantification/compile_abundance.sh results/quantification/rsem \
+bash scripts/assembly/post_assembly/quantification/compile_abundance.sh \
+results/assembly/trinity/abundance_estimation \
 results/assembly/trinity/Trinity-GG.fasta.gene_trans_map \
 resources/containers/trinityrnaseq_latest.sif \
-results/quantification/compiled
+results/assembly/trinity/abundance_estimation/compiled_abundance
 ```
 ⸺
 
@@ -368,19 +347,19 @@ results/quantification/compiled
 Computes cumulative feature counts across samples.
 The script takes three arguments: a directory containing RSEM output files, a Singularity image, and an output directory.
 #### Inputs
-- RSEM directories (e.g., results/quantification/rsem/rsem_*)
-#### Ouputs
+- Per-sample RSEM output directories (e.g., `rsem_sample_*`) within `results/assembly/trinity/abundance_estimation/`
+#### Outputs
 - Per-sample cumulative count files, and combined summary file (`cumul_counts_combined.txt`)
 #### Usage
 ```bash
-bash scripts/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> <output_dir>
+bash scripts/assembly/post_assembly/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> <output_dir>
 ```
 #### Example
 ```bash
-bash scripts/quantification/cumulative_counts.sh \
-results/quantification \
+bash scripts/assembly/post_assembly/quantification/cumulative_counts.sh \
+results/assembly/trinity/abundance_estimation \
 trinityrnaseq_latest.sif \
-results/quantification/cumulative_counts
+results/assembly/trinity/abundance_estimation/cumulative_counts
 ```
 
 ---
