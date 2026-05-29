@@ -6,9 +6,7 @@ Transcriptome assembly was performed using a genome-guided de novo approach with
 
 ---
 
-## Pipeline Structure
-
-The assembly workflow consists of five stages:
+## Workflow Structure
 
 1. Preprocessing and Quality Control 
 2. Read Mapping (genome-guided setup) 
@@ -215,7 +213,7 @@ results/assembly/mapping/combined_for_assembly.bam
 
 ---
 
-### 3. Run Trinity Assembly
+## 3. Run Trinity Assembly
 
 [trinity_run.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/trinity/trinity_run.sh)
 
@@ -384,3 +382,20 @@ results/quantification \
 trinityrnaseq_latest.sif \
 results/quantification/cumulative_counts
 ```
+
+---
+
+## Singularity Container for Trinity
+The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
+
+The container was pulled from Docker Hub using:
+```bash
+singularity pull --dir resources/ docker://trinityrnaseq/trinityrnaseq
+```
+
+Scripts using Trinity are designed to run inside the container using:
+```bash
+singularity exec --bind $(pwd):$(pwd) resources/trinityrnaseq_latest.sif <command>
+```
+
+For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
