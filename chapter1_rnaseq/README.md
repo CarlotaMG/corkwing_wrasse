@@ -70,8 +70,6 @@ Most scripts in this repository are modular and can be executed locally or on Un
 
 This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
 
-#### Containers
-Trinity(assembly) and Trinotate(annotation) were run inside Singularity/Apptainer containers for reproducibility. 
 #### HPC Modules
 The following environment modules were loaded on Saga (Sigma2 cluster):
 - FastQC/0.12.1-Java-11
