@@ -4,7 +4,7 @@ This repository accompanies a PhD project focused on the genomics and transcript
 
 ---
 
-## [Chapter 1: Temperature-Dependent Gene Expression](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/README.md)
+## Chapter 1: Temperature-Dependent Gene Expression
 
 This chapter explores gene expression responses to temperature in Symphodus melops from southern and western Norwegian populations and their hybrids, based on RNA-seq data from fish exposed to three temperature conditions.
 It includes:
@@ -18,6 +18,8 @@ It includes:
 - Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
 - Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
  
+See full details in the [Chapter 1 README](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq).
+
 ---
 
 ## Chapter 2: Genomic Divergence, Selection, and Structural Variation *(planned)*
