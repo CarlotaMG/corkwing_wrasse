@@ -44,15 +44,16 @@ This chapter is currently under development.
 
 ---
 
-## Documentation
+## Results
 
-Rendered HTML reports are available in the `docs/` directory and published via GitHub Pages:
+Reproducible analysis workflows and results are available at:
 
 🔗 https://carlotamg.github.io/corkwing_wrasse/
 
 
 ## Repository Structure
 
+```
 corkwing_wrasse/
 ├── chapter1_rnaseq/     # RNA-seq analysis and transcriptome assembly
 ├── chapter2_wgs/        # Whole-genome sequencing and variant analysis (planned)
@@ -60,7 +61,7 @@ corkwing_wrasse/
 ├── docs/                # Rendered HTML reports
 ├── LICENSE              # MIT license
 └── README.md            # Project overview (this file)
-
+```
 ## Resources
 
 ### Reference Genome
