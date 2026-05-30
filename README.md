@@ -48,10 +48,8 @@ This chapter is currently under development.
 
 ## Results
 
-Reproducible analysis workflows and results are available at:
-
-🔗 https://carlotamg.github.io/corkwing_wrasse/
-
+Reproducible analysis reports are available at:
+https://carlotamg.github.io/corkwing_wrasse/
 
 ## Repository Structure
 
