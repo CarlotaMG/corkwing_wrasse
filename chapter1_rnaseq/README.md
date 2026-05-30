@@ -2,8 +2,6 @@
 
 This repository contains scripts and results for RNA-seq analysis of *Symphodus melops* (corkwing wrasse) from southern and western Norwegian populations and their hybrids. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses to temperature, population divergence, hybrid inheritance and misexpression.
 
-Rendered HTML reports from sample quality control and RMarkdown analyses are hosted via GitHub Pages at [carlotamg.github.io/corkwing_wrasse](https://carlotamg.github.io/corkwing_wrasse).
-
 ---
 
 ## Differential Expression Tiers
@@ -117,6 +115,16 @@ chapter1_rnaseq/
 │   └── functional_enrichment/ # Functional enrichment 
 ```
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
+
+
+---
+
+
+## Results
+
+Analysis reports, including quality control summaries and downstream results, are available at:
+
+[carlotamg.github.io/corkwing_wrasse](https://carlotamg.github.io/corkwing_wrasse)
 
 ---
 

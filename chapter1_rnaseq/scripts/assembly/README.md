@@ -126,6 +126,15 @@ resources/adapters/TruSeq3-PE.fa \
 $SLURM_CPUS_PER_TASK
 ```
 
+⸺
+
+### Quality Control Reports
+
+MultiQC reports summarizing read quality before and after trimming for this analysis are available:
+
+- [Raw reads MultiQC](https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/qc_reports/multiqc_raw.html)
+- [Trimmed reads MultiQC](https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/qc_reports/multiqc_trimmed.html)
+
 ---
 
 ## 2. Mapping
