@@ -4,59 +4,70 @@ This repository contains scripts and results for RNA-seq analysis of *Symphodus 
 
 ---
 
-## Differential Expression Tiers
+## Data Availability
 
-To interpret temperature-dependent gene expression, we defined candidate sets across three tiers:
+Raw RNA-seq data generated for this study are available at the European Nucleotide Archive (ENA) under accession:
 
-- **Tier 1: Shared temperature-responsive genes** 
-  Genes consistently regulated by temperature across all origins. Defined by intersecting results from all pairwise temperature contrasts of the additive DE model. 
- 
-	*Biological rationale*: given their consistent regulation across populations, these genes are expected to represent conserved components of the temperature response.
+**PRJEBXXXXX**.
 
-- **Tier 2: Divergence between West and South origins** 
-  Constitutive differences between origins using the additive DE model 
-  	
-	*Biological rationale*: represents baseline expression differences between populations, potentially reflecting underlying regulatory divergence.
+Processed data supporting the findings of this study are available at Zenodo:
 
-
-- **Tier 2b: Local thermal adaptation candidates**
-  Overlap between Tier 2 constitutive differences and genes with significant interaction effects.
- 
-	*Biological rationale*: strongest candidates for local adaptation, combining constitutive divergence with origin-specific plasticity.
-
-- **Tier 3: Hybrid inheritance and misexpression**
-  Defined using the condition DE model at the isoform level. Categories include:
-  - Misexpression (within-range and transgressive)
-  - South-like inheritance
-  - West-like inheritance
- 
-	*Biological rationale*: provides insight into how parental expression programs are maintained or disrupted in hybrids, highlighting regulatory incompatibilities.
+https://doi.org/XXXXX
 
 ---
 
+## Analysis Overview
+
 This chapter includes:
 
-- Guided de novo transcriptome assembly using Trinity
-- Transcript annotation with Trinotate, EggNog, InterProScan and Genome-Based GFF Integration
-- PCA and clustering to visualize sample structure
-- Model comparison to evaluate differential expression patterns and select models for gene extraction across tiers
-- Differential expression analyses across temperature treatments and pedigrees using DESeq2
-- Selection of tier gene sets to identify temperature-responsive, locally adapted, and misexpressed candidate genes
-- Functional enrichment of tier gene sets to identify associated biological processes and pathways
+- Guided de novo transcriptome assembly using Trinity  
+- Transcript annotation with Trinotate, EggNog, InterProScan and genome-based GFF integration  
+- PCA and clustering to visualize sample structure  
+- Model comparison to evaluate differential expression patterns and guide gene set selection  
+- Differential expression analyses across temperature treatments and pedigrees using DESeq2  
+- Selection of gene sets representing temperature-responsive, population-divergent, and hybrid inheritance  
+- Functional enrichment of gene sets to identify associated biological processes and pathways  
 
 ---
 
 ## Workflow
 
-1. **[Transcriptome Assembly](scripts/assembly/README.md)**
+1. **[Transcriptome Assembly](scripts/assembly/README.md)**  
+2. **[Sample Clustering](scripts/sample_clustering/README.md)**  
+3. **[Differential Expression](scripts/DE/README.md)**  
+4. **[Annotation](scripts/annotation/README.md)**  
+5. **[Functional Enrichment](scripts/functional_enrichment/README.md)**  
 
-2. **[Sample Clustering](scripts/sample_clustering/README.md)**
+---
 
-3. **[Differencial Expression](scripts/DE/README.md)**
+## Differential Expression Framework
 
-4. **[Annotation](scripts/annotation/README.md)**
+Differential expression analysis identified gene expression patterns across temperature treatments and population origins.
 
-5. **[Functional Enrichment](scripts/functional_enrichment/README.md)**
+Candidate gene sets were defined and grouped into three categories (referred to here as "tiers"):
+
+- **Tier 1: Shared temperature-responsive genes**
+  Genes consistently regulated by temperature across all origins. Defined by intersecting results from all pairwise temperature contrasts of the additive DE model.
+
+        *Biological rationale*: given their consistent regulation across populations, these genes are expected to represent conserved components of the temperature response.
+
+- **Tier 2: Divergence between West and South origins**
+  Constitutive differences between origins using the additive DE model
+
+        *Biological rationale*: represents baseline expression differences between populations, potentially reflecting underlying regulatory divergence.
+
+
+- **Tier 2b: Local thermal adaptation candidates**
+  Overlap between Tier 2 constitutive differences and genes with significant interaction effects.
+
+        *Biological rationale*: strongest candidates for local adaptation, combining constitutive divergence with origin-specific plasticity.
+- **Tier 3: Hybrid inheritance and misexpression**
+  Defined using the condition DE model at the isoform level. Categories include:
+  - Misexpression (within-range and transgressive)
+  - South-like inheritance
+  - West-like inheritance
+
+        *Biological rationale*: provides insight into how parental expression programs are maintained or disrupted in hybrids, highlighting regulatory incompatibilities.
 
 ---
 
@@ -85,7 +96,7 @@ SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were int
 #### R-based analyses
 All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
 
-Details of container setup, module usage, external data resources and R sessions are documented in each section README. 
+Details of container setup, module usage, external data resources and R sessions are documented in each section README.
 
 ---
 
@@ -112,13 +123,12 @@ chapter1_rnaseq/
 │   ├── annotation/           # Functional annotation (Trinotate, EggNOG, etc.)
 │   ├── DE/                   # Differential expression analysis
 │   ├── sample_clustering/    # PCA analysis
-│   └── functional_enrichment/ # Functional enrichment 
+│   └── functional_enrichment/ # Functional enrichment
 ```
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 
 
 ---
-
 
 ## Results
 
@@ -132,4 +142,3 @@ Analysis reports, including quality control summaries and downstream results, ar
 
 If you use this workflow or results, please cite:
 *Waiting on publication*
-
