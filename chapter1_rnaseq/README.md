@@ -78,6 +78,7 @@ Most scripts in this repository are modular and can be executed locally or on Un
 > SLURM job scripts used during analysis are not included in the repository to maintain clarity. Instead, modular scripts are documented with usage examples and can be integrated into SLURM workflows as needed.
 
 This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
+This modular design also facilitates adaptation of individual components of the workflow to other RNA-seq studies, allowing reuse of scripts and analytical steps beyond this specific dataset.
 
 #### HPC Modules
 The following environment modules were loaded on Saga (Sigma2 cluster):
