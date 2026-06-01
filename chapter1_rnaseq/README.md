@@ -30,7 +30,7 @@ This chapter includes:
 
 ---
 
-## Workflow
+## Table of Content
 
 1. **[Transcriptome Assembly](scripts/assembly/README.md)**  
 2. **[Sample Clustering](scripts/sample_clustering/README.md)**  
