@@ -15,8 +15,6 @@ This analysis is implemented in R and includes preparation and filtering of the 
 
 ## Outputs
 
-Key outputs include:
-
 - PCA plots  
 - Variance explained summaries  
 - PCA score tables  
