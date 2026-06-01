@@ -29,8 +29,26 @@ scripts/assembly/
     ├── stats/            # Assembly evaluation (BUSCO, stats)
     └── quantification/   # Transcript abundance estimation
 ```
+---
 
-Most output directories are created automatically by scripts; however, some base directories are expected to exist. Script usage examples below illustrate the expected input and output paths.
+## Output Structure
+
+Assembly outputs corresponding to the workflow steps described above are organised within:
+
+```
+results/assembly/
+├── preprocessing/            # FastQC and MultiQC reports
+├── mapping/                  # Sorted BAM files and merged alignment
+├── trinity/                  # Assembled transcriptome and associated Trinity outputs (including abundance estimation)
+│   └── abundance_estimation/
+│       ├── rsem_sample_*/         # Per-sample RSEM outputs (expression estimates)
+│       ├── compiled_abundance/    # Combined gene and isoform abundance matrices
+│       └── cumulative_counts/     # Per-sample and combined cumulative count summaries
+└── post_assembly/
+    └── stats/                # Assembly evaluation (BUSCO, Trinity stats)
+```
+
+These directories are populated by the corresponding scripts during execution, although some base directories may need to be created beforehand. Script usage examples below illustrate the expected input and output paths.
 
 ---
 
@@ -218,7 +236,7 @@ bash scripts/assembly/trinity/trinity_run.sh <bam_file> <singularity_image> <out
 #### Example
 ```bash
 bash scripts/assembly/trinity/trinity_run.sh \
-results/mapping/combined_for_assembly.bam \
+results/assembly/mapping/combined_for_assembly.bam \
 resources/trinityrnaseq_latest.sif results/assembly/trinity
 ```
 > **Note:** Trinity was run in genome-guided mode with --genome_guided_max_intron 20000.
