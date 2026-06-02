@@ -40,6 +40,9 @@ chapter1_rnaseq/.here
 # Output files from R CMD check
 /*.Rcheck/
 
+# RStudio project files
+*.Rproj
+
 # RStudio files
 .Rproj.user/
 
