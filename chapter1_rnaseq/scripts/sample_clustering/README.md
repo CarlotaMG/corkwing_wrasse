@@ -32,4 +32,4 @@ https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/PCA.html
 
 ## Environment
 
-Full session information and package versions are provided in the results report.
+Required libraries and package versions are documented in the results report.
