@@ -27,3 +27,9 @@ This analysis is implemented in R and includes preparation and filtering of the 
 Full analysis report (code, plots, and summary tables):
 
 https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/PCA.html
+
+---
+
+## Environment
+
+Full session information and package versions are provided in the results report.
