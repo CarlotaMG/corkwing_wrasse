@@ -1,6 +1,6 @@
 # Corkwing Wrasse RNA-seq Analysis
 
-This repository contains scripts and results for RNA-seq analysis of *Symphodus melops* (corkwing wrasse) from southern and western Norwegian populations and their hybrids. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses to temperature, population divergence, hybrid inheritance and misexpression.
+This repository contains scripts and results for RNA-seq analysis of *Symphodus melops* (corkwing wrasse) from southern and western Norwegian populations and their hybrids. Individuals were experimentally exposed to three temperature treatments (12°C, 15°C, and 18°C) to assess transcriptional responses to temperature across populations and hybrids.
 
 ---
 
@@ -30,9 +30,9 @@ This chapter includes:
 
 ## Differential Expression Framework
 
-Differential expression analysis identified gene expression patterns across temperature treatments and population origins.
+Differential expression analysis identified gene expression patterns across temperature treatments and population origins. These results were used to define biologically meaningful gene sets based on shared, divergent, and hybrid-specific transcriptional responses.
 
-Candidate gene sets were defined and grouped into three categories (referred to here as "tiers"):
+Candidate gene sets were grouped into three categories (referred to here as "tiers"):
 
 - **Tier 1: Shared temperature-responsive genes**
   Genes consistently regulated by temperature across all origins. Defined by intersecting results from all pairwise temperature contrasts of the additive DE model.
