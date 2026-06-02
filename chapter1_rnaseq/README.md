@@ -4,18 +4,6 @@ This repository contains scripts and results for RNA-seq analysis of *Symphodus 
 
 ---
 
-## Data Availability
-
-Raw RNA-seq data generated for this study are available at the European Nucleotide Archive (ENA) under accession:
-
-**PRJEBXXXXX**.
-
-Processed data supporting the findings of this study are available at Zenodo:
-
-https://doi.org/XXXXX
-
----
-
 ## Analysis Overview
 
 This chapter includes:
@@ -136,6 +124,18 @@ All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Sc
 Analysis reports, including quality control summaries and downstream results, are available at:
 
 [carlotamg.github.io/corkwing_wrasse](https://carlotamg.github.io/corkwing_wrasse)
+
+---
+
+## Data Availability
+
+Raw RNA-seq data generated for this study are available at the European Nucleotide Archive (ENA) under accession:
+
+**PRJEBXXXXX**.
+
+Processed data supporting the findings of this study are available at Zenodo:
+
+https://doi.org/XXXXX
 
 ---
 
