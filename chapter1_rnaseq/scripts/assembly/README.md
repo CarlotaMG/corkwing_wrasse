@@ -31,6 +31,9 @@ scripts/assembly/
     ├── stats/            # Assembly evaluation (BUSCO, stats)
     └── quantification/   # Transcript abundance estimation
 ```
+
+All scripts are designed to be executed from the `chapter1_rnaseq/` directory using relative paths.
+
 ---
 
 ## Output Structure
@@ -393,10 +396,15 @@ results/assembly/trinity/abundance_estimation/cumulative_counts
 
 ---
 
-## Singularity Container for Trinity
-The container used during transcriptome assembly was pulled from Docker Hub on October 9, 2024. It included Trinity v2.15.2, along with other tools required for quantification and transcriptome processing.
+## Execution environment
 
-The container was pulled from Docker Hub using:
+
+Trinity and related steps were executed using a Singularity container, while all other steps were run using HPC modules available on the Saga (Sigma2) cluster.
+
+The Trinity container includes Trinity v2.15.2 along with required dependencies for transcriptome assembly and downstream processing, including post-assembly statistics and quantification.
+
+The container was pulled from Docker Hub on October 9, 2024 using:
+
 ```bash
 singularity pull --dir resources/ docker://trinityrnaseq/trinityrnaseq
 ```
@@ -407,3 +415,7 @@ singularity exec --bind $(pwd):$(pwd) resources/trinityrnaseq_latest.sif <comman
 ```
 
 For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
+
+Preprocessing, mapping, and post-assembly evaluation steps (including FastQC, MultiQC, Trimmomatic, STAR, and BUSCO) were executed using HPC modules.
+
+A complete list of modules and environment details for the full Chapter 1 workflow is provided in the [Chapter 1 README (HPC Modules section)](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq/README.md#hpc-modules).
