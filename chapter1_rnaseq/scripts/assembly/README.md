@@ -34,7 +34,7 @@ scripts/assembly/
 results/assembly/
 ├── preprocessing/            # FastQC and MultiQC reports
 ├── mapping/                  # Sorted BAM files and merged alignment
-├── trinity/                  # Assembled transcriptome and associated Trinity outputs (including abundance estimation)
+├── trinity/                  # Assembled transcriptome and associated Trinity outputs
 │   └── abundance_estimation/
 │       ├── rsem_sample_*/         # Per-sample RSEM outputs (expression estimates)
 │       ├── compiled_abundance/    # Combined gene and isoform abundance matrices
