@@ -4,7 +4,7 @@
 
 Transcriptome assembly was performed using a genome-guided de novo approach with Trinity. RNA-seq reads were quality controlled, trimmed, and aligned to the reference genome using STAR. Alignments were used to guide transcriptome assembly, followed by evaluation and transcript quantification.
 
-This document provides detailed script-level documentation for each step of the assembly workflow.
+This document provides detailed script-level documentation for each step of the assembly process to support reproducibility, with scripts designed to be modular and to accept command-line arguments, allowing them to be applied independently or adapted for other analyses.
 
 ---
 
