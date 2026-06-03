@@ -33,19 +33,30 @@ scripts/assembly/
 
 results/assembly/
 ├── preprocessing/            # FastQC and MultiQC reports
+│   ├── fastQC/
+│   │   ├── raw/
+│   │   └── trimmed/
+│   └── multiQC/
+│       ├── raw/
+│       └── trimmed/
+│
 ├── mapping/                  # Sorted BAM files and merged alignment
+│   └── indexing/             # STAR genome index
+│
 ├── trinity/                  # Assembled transcriptome and associated Trinity outputs
 │   └── abundance_estimation/
-│       ├── rsem_sample_*/         # Per-sample RSEM outputs (expression estimates)
+│       ├── rsem_sample_*/         # Per-sample RSEM outputs (created dynamically)
 │       ├── compiled_abundance/    # Combined gene and isoform abundance matrices
 │       └── cumulative_counts/     # Per-sample and combined cumulative count summaries
+│
 └── post_assembly/
     └── stats/                # Assembly evaluation (BUSCO, Trinity stats)
+        └── busco/
 ```
 
 All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
 
-These directories are populated by the corresponding scripts during execution, although some base directories may need to be created beforehand. Script usage examples below illustrate the expected input and output paths.
+Most directories are created and populated by the corresponding scripts during execution, although some may need to be created beforehand. The directory structure is provided here to ensure that the workflow can be reproduced if needed. Script usage examples below illustrate the expected input and output paths.
 
 ---
 
