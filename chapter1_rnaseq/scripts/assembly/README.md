@@ -20,7 +20,7 @@ This document provides detailed script-level documentation for each step of the 
 
 ## Directory Structure
 
-The assembly workflow is organized into modular components:
+The assembly workflow and its outputs are organised as follows:
 
 ```
 scripts/assembly/
@@ -30,17 +30,7 @@ scripts/assembly/
 └── post_assembly/
     ├── stats/            # Assembly evaluation (BUSCO, stats)
     └── quantification/   # Transcript abundance estimation
-```
 
-All scripts are designed to be executed from the `chapter1_rnaseq/` directory using relative paths.
-
----
-
-## Output Structure
-
-Assembly outputs corresponding to the workflow steps described above are organised within:
-
-```
 results/assembly/
 ├── preprocessing/            # FastQC and MultiQC reports
 ├── mapping/                  # Sorted BAM files and merged alignment
@@ -52,6 +42,8 @@ results/assembly/
 └── post_assembly/
     └── stats/                # Assembly evaluation (BUSCO, Trinity stats)
 ```
+
+All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
 
 These directories are populated by the corresponding scripts during execution, although some base directories may need to be created beforehand. Script usage examples below illustrate the expected input and output paths.
 
@@ -399,7 +391,7 @@ results/assembly/trinity/abundance_estimation/cumulative_counts
 ## Execution environment
 
 
-Trinity and related steps were executed using a Singularity container, while all other steps were run using HPC modules available on the Saga (Sigma2) cluster.
+Trinity and related steps were executed within a Singularity container, while all other steps were run using HPC modules available on the Saga (Sigma2) cluster.
 
 The Trinity container includes Trinity v2.15.2 along with required dependencies for transcriptome assembly and downstream processing, including post-assembly statistics and quantification.
 
@@ -415,6 +407,7 @@ singularity exec --bind $(pwd):$(pwd) resources/trinityrnaseq_latest.sif <comman
 ```
 
 For more information, see [Trinity GitHub repository](https://github.com/trinityrnaseq/trinityrnaseq/tree/master/Docker).
+
 
 Preprocessing, mapping, and post-assembly evaluation steps (including FastQC, MultiQC, Trimmomatic, STAR, and BUSCO) were executed using HPC modules.
 
