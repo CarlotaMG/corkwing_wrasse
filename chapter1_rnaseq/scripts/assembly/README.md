@@ -12,7 +12,7 @@ This document provides detailed script-level documentation for each step of the 
 
 1. [Preprocessing and Quality Control](#1-preprocessing-and-quality-control)  
 2. [Mapping](#2-mapping)  
-3. [Transcriptome Assembly](#3-transcriptome-assembly)  
+3. [Trinity Assembly](#3-trinity-assembly)  
 4. [Assembly Evaluation](#4-assembly-evaluation)  
 5. [Transcript Quantification](#5-transcript-quantification)  
 
