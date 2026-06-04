@@ -141,5 +141,5 @@ https://doi.org/XXXXX
 
 ## Citation
 
-If you use this workflow or results, please cite:
+If you this workflow, any of its components, or its results, please cite:
 *Waiting on publication*
