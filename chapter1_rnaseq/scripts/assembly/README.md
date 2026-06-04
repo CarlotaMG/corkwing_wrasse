@@ -8,13 +8,15 @@ This document provides detailed script-level documentation for each step of the 
 
 ---
 
-## Workflow Structure
+## Workflow
 
-1. Preprocessing and Quality Control 
-2. Read Mapping  
-3. Transcriptome Assembly 
-4. Assembly Evaluation 
-5. Transcript Quantification 
+1. [Preprocessing and Quality Control](#1-preprocessing-and-quality-control)  
+2. [Mapping](#2-mapping)  
+3. [Transcriptome Assembly](#3-transcriptome-assembly)  
+4. [Assembly Evaluation](#4-assembly-evaluation)  
+5. [Transcript Quantification](#5-transcript-quantification)  
+
+The execution environment used to run these steps is described in the [Execution Environment](#execution-environment) section.
 
 ---
 
