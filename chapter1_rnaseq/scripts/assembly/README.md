@@ -54,9 +54,9 @@ results/assembly/
         └── busco/
 ```
 
-All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
-
 Most directories are created and populated by the corresponding scripts during execution, although some may need to be created beforehand. The directory structure is provided here to ensure that the workflow can be reproduced if needed. Script usage examples below illustrate the expected input and output paths.
+
+All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
 
 ---
 
