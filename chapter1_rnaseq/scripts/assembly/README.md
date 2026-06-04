@@ -13,7 +13,7 @@ This document provides detailed script-level documentation for each step of the 
 1. Preprocessing and Quality Control 
 2. Read Mapping  
 3. Transcriptome Assembly 
-4. Post-assembly Evaluation 
+4. Assembly Evaluation 
 5. Transcript Quantification 
 
 ---
@@ -253,7 +253,7 @@ To accommodate this, the script was executed via a SLURM job with --cpus-per-tas
 
 ---
 
-## 4. Post-assembly Evaluation
+## 4. Assembly Evaluation
 
 [trinity_stats.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/stats/trinity_stats.sh)
 
@@ -309,7 +309,7 @@ results/assembly/post_assembly/stats/busco \
 
 ---
 
-## 5. Post-assembly Quantification
+## 5. Transcript Quantification
 
 [estimate_abundance.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/assembly/post_assembly/quantification/estimate_abundance.sh)
 
