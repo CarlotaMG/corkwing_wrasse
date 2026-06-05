@@ -389,7 +389,10 @@ The script takes three arguments: a directory containing RSEM output files, a Si
 - Per-sample cumulative count files, and combined summary file (`cumul_counts_combined.txt`)
 #### Usage
 ```bash
-bash scripts/assembly/post_assembly/quantification/cumulative_counts.sh <rsem_dir> <singularity_image> <output_dir>
+bash scripts/assembly/post_assembly/quantification/cumulative_counts.sh \
+<rsem_dir> \
+<singularity_image> \
+<output_dir>
 ```
 #### Example
 ```bash
