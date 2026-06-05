@@ -424,4 +424,4 @@ For more information, see [Trinity GitHub repository](https://github.com/trinity
 
 Preprocessing, mapping, and post-assembly evaluation steps (including FastQC, MultiQC, Trimmomatic, STAR, and BUSCO) were executed using HPC modules.
 
-A complete list of modules and environment details for the full Chapter 1 workflow is provided in the [Chapter 1 README (HPC Modules section)](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/README.md#hpc-modules).
+A complete list of modules and versions used in Chapter 1 provided in the [Chapter 1 README (HPC Modules section)](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/README.md#hpc-modules).
