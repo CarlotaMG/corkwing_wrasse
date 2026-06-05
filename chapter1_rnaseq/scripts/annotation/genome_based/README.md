@@ -20,21 +20,9 @@ The Trinity transcriptome was first aligned to the reference genome to obtain ge
 
 ---
 
-# Transcriptome–Genome Intersection
-
-## Overview
-# Transcriptome–Genome Intersection
-This module describes the integration of the Trinity transcriptome with the genome-based annotation through coordinate-based intersection.
-
-The Trinity transcriptome was first aligned to the reference genome to obtain genomic coordinates for each transcript. These alignments were then intersected with genome annotation features (GFF) to quantify the extent to which annotated mRNA gene models are recapitulated by assembled transcripts.
-
----
-
-## Workflow
-
 ### 1. Transcriptome Alignment to Genome
 
-./align_transcriptome.sh
+[align_transcriptome.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/genome_based/align_transcriptome.sh)
 
 Aligns the assembled transcriptome to the reference genome using minimap2 in splice-aware mode. The resulting alignments are converted to BAM format, sorted, and indexed using samtools.
 
