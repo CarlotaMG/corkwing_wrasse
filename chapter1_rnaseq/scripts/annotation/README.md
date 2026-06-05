@@ -12,6 +12,7 @@ The workflow integrates these sources through comparison and merging to produce 
 
 The annotation workflow and its outputs are organised as follows:
 
+```
 scripts/annotation/
 ├── genome_based/      # Transcript–genome intersection and filtering
 ├── eggnog/            # EggNOG functional annotation pipeline
@@ -27,7 +28,7 @@ results/annotation/
     ├── signalp/           # Signal peptide predictions
     ├── tmhmm/             # Transmembrane helix predictions
     └── trinotate_final/   # Final Trinotate annotation report
-
+```
 Most directories are created and populated by the corresponding scripts during execution, although some may need to be created beforehand. The directory structure is provided here to ensure that the workflow can be reproduced if needed. Script usage examples below illustrate the expected input and output paths.
 
 All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
@@ -57,7 +58,7 @@ The genome-based annotations are available at:
 https://doi.org/XXXXX
 
 Detailed processing steps and scripts are described in:
-`scripts/annotation/genome_based/README.md`
+[scripts/annotation/genome_based/README.md](scripts/annotation/genome_based/README.md)
 ---
 
 ## 2. Transcriptome-based annotation
