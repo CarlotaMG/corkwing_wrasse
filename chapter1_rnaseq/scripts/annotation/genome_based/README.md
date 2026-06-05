@@ -88,7 +88,7 @@ results/annotation/genome_based/intersection
 
 ### 3. Coverage-Based Summarisation
 
-[summarise_annotation_coverage.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/genome_based/summarise_annotation_coverage.sh
+[summarise_annotation_coverage.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/genome_based/summarise_annotation_coverage.sh)
 
 Summarises transcript–annotation overlaps by computing the proportion of each Trinity transcript covered by annotated mRNA features. For each transcript, the best matching annotation (highest coverage) is retained.
 
