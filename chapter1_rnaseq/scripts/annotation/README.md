@@ -59,6 +59,7 @@ https://doi.org/XXXXX
 
 Detailed processing steps and scripts are described in:
 [scripts/annotation/genome_based/README.md](scripts/annotation/genome_based/README.md)
+
 ---
 
 ## 2. Transcriptome-based annotation
