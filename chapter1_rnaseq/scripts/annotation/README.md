@@ -63,29 +63,55 @@ https://doi.org/XXXXX
 
 ## 2. Transcriptome-based annotation
 
-Functional annotation of the Trinity transcriptome was performed using multiple complementary approaches, each providing distinct sources of functional information:
+Functional annotation of the Trinity transcriptome was performed using three complementary pipelines:
 
-- `scripts/annotation/trinotate/README.md` — integrates homology searches, protein domain identification, and structural features into a unified annotation framework  
-- `scripts/annotation/eggnog/README.md` — assigns orthology-based functional annotations, including GO terms, KEGG pathways, and COG categories  
-- `scripts/annotation/ips/README.md` — identifies conserved protein domains and associated functional annotations using InterProScan  
+- [Trinotate](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq/scripts/annotation/trinotate)
+- [EggNOG‑mapper](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq/scripts/annotation/eggnog)
+- [InterProScan](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq/scripts/annotation/ips)
 
-Each method was executed independently and generates complementary annotation evidence for downstream integration.
+Each pipeline was executed independently and provides distinct sources of functional annotation (homology, protein domains, orthology, and structural features). The results from all pipelines are integrated downstream into a unified annotation framework.
 
 ---
 
-## 3. Annotation comparison and integration
+## 3. Annotation Comparison and Integration
 
-Annotation outputs from all sources (genome-based annotation, Trinotate, EggNOG, and InterProScan) were processed and integrated into a unified annotation framework for downstream analyses.
+Annotation outputs from EggNOG, InterProScan (IPS), Trinotate, and genome-based annotation were compared and integrated into a unified gene-level annotation table for the Trinity transcriptome.
 
-Details of the integration workflow, including inputs and outputs, are described in:
-`scripts/annotation/integration/README.md`
+The following was performed:
 
-The integration and analysis are implemented in:
-`scripts/annotation/annotations.Rmd`
+- standardises gene and transcript identifiers across annotation sources  
+- integrates SignalP and DeepTMHMM predictions into Trinotate outputs  
+- extracts and harmonises functional annotations (GO, KEGG, domains)  
+- combines complementary evidence into a unified annotation table  
+- classifies genes based on annotation support  
+- evaluates annotation coverage and overlap across sources  
+- summarises annotation patterns across functional tiers  
 
-This step includes:
+### Inputs
 
-- Harmonisation of transcript and gene identifiers across annotation sources  
-- Comparison of annotation coverage and overlap  
-- Integration of functional annotations into a combined dataset  
+- EggNOG annotation outputs  
+- InterProScan (IPS) outputs  
+- Trinotate report (including SignalP and DeepTMHMM integration)  
+- Genome-based annotation  
+
+### Outputs
+
+- Integrated annotation table combining all sources  
+- Annotation classification (e.g. well-annotated, partially annotated, unannotated)  
+- Summary statistics of annotation coverage  
+- Annotation overlap analyses across sources  
+- Tier-specific annotation summaries  
+
+
+### Results
+
+Full analysis report (code, tables, plots, and interpretation):
+
+https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/annotations.html
+
+---
+
+### Environment
+
+All required R packages and versions are documented within the analysis report.
 
