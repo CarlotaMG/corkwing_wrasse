@@ -33,14 +33,15 @@ The outputs of the Trinotate workflow are organised as follows:
 results/annotation/trinotate/
 ├── transdecoder_longorfs/    # ORF candidates (initial longest ORFs)
 ├── blastp/                   # Protein homology results (Swiss-Prot)
-├── pfam/                     # Protein domain annotation (Pfam)
+├── pfam/
+│   └── chunks/               # Chunked outputs (SLURM array jobs)
 ├── transdecoder_predict/     # Final ORF predictions
 ├── blastx/
-│   └── chunks/               # Transcript homology results (chunked, SLURM)
+│   └── chunks/               # Chunked outputs (SLURM array jobs)
 ├── signalp/
-│   └── chunks/               # Signal peptide predictions (chunked, SLURM)
+│   └── chunks/               # Chunked outputs (SLURM array jobs)
 ├── tmhmm/
-│   └── chunks/               # Transmembrane predictions (chunked, SLURM)
+│   └── chunks/               # Chunked outputs (SLURM array jobs)
 ├── trinotate_data/           # External annotation databases
 ├── trinotate_final/          # Integrated Trinotate outputs
 └── go_extraction/            # GO annotation summaries
@@ -48,12 +49,9 @@ results/annotation/trinotate/
 
 Most directories are created and populated by the corresponding scripts during execution, although some may need to be created beforehand. The directory structure is provided here to ensure that the workflow can be reproduced if needed. Script usage examples below illustrate the expected input and output paths.
 
-Several steps (e.g. BLASTX, Pfam, SignalP, and DeepTMHMM) are executed in parallel using SLURM array jobs, producing chunked outputs within the respective tool directories.
+Several steps (BLASTX, Pfam, SignalP, and DeepTMHMM) are executed in parallel using SLURM array jobs, producing chunked outputs within the respective tool directories.
 
 All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
-
-
-
 
 ---
 
@@ -118,7 +116,7 @@ results/annotation/trinotate/blastp
 ## 3. Pfam
 [pfam.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam.sh)
 
-Runs hmmscan on predicted peptide sequences to identify conserved protein domains, The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
+Runs hmmscan on predicted peptide sequences to identify conserved protein domains. The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
 ##### Inputs
 - Predicted peptide sequences (e.g., longest_orfs.pep)
 ##### Outputs
@@ -146,7 +144,7 @@ results/annotation/trinotate/pfam \
 
 ##### Post-run
 ```bash
-cat /results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotation/trinotate/pfam/pfam_merged.domtblout
+cat results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotation/trinotate/pfam/pfam_merged.domtblout
 ```
 
 ---
@@ -194,7 +192,7 @@ bash scripts/annotation/trinotate/transdecoder_predict.sh \
 
 ## 5. BLASTX
 
-BLASTX was used to search the Trinity transcriptome against the SwissProt protein database using the BLAST+ module available on the Saga cluster. Because the dataset was large, the transcriptome FASTA was processed in chunks using SLURM array jobs. Per‑chunk BLASTX outputs were then merged into a single file for Trinotate
+BLASTX was used to search the Trinity transcriptome against the SwissProt protein database using the BLAST+ module available on the Saga cluster. Because the dataset was large, the transcriptome FASTA was processed in chunks using SLURM array jobs. Per‑chunk BLASTX outputs were then merged into a single file for downstream integration into Trinotate.
 
 [blastx_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/blastx_chunking.sh)
 
@@ -279,7 +277,7 @@ bash scripts/annotation/trinotate/signalp_prepare.sh resources/signalp
 ```
 ⸺
 
-[signalp_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/tmhmm_chunking.sh)
+[signalp_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/signalp_chunking.sh)
 
 Splits a large peptide FASTA file into smaller chunks (~10,000 sequences each) to enable parallel execution on the HPC.
 
