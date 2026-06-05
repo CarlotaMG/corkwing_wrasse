@@ -54,11 +54,11 @@ The resulting annotation includes gene models and corresponding predicted protei
 
 The annotation was further processed by aligning the Trinity transcriptome to the reference genome, standardising FASTA headers for compatibility, and intersecting transcript alignments (BAM) with genome annotation features (GFF). The resulting overlaps were processed and summarised based on the coverage of annotated mRNA models by assembled transcripts, providing a quantitative measure of agreement between annotated gene models and transcript reconstructions.
 
+Detailed processing steps and scripts are described in:
+[Transcriptome–Genome Intersection](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq/scripts/annotation/genome_based)
+
 The genome-based annotations are available at:
 https://doi.org/XXXXX
-
-Detailed processing steps and scripts are described in:
-[scripts/annotation/genome_based/README.md](scripts/annotation/genome_based/README.md)
 
 ---
 
