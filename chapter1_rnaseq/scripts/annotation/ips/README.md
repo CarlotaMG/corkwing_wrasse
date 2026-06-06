@@ -1,17 +1,12 @@
 # InterProScan (IPS) Annotation
 
-## Overview
+InterProScan was used to annotate predicted peptide sequences with protein domains, Gene Ontology (GO) terms, and pathway annotations.
 
-Functional annotation of the Trinity-assembled transcriptome was performed using multiple complementary approaches, including InterProScan.
+It integrates multiple protein signature databases (e.g., Pfam, SMART, PROSITE, SUPERFAMILY), enabling identification of conserved functional features and domain architectures.
 
-InterProScan provides protein domain and functional annotation by integrating multiple databases (e.g., Pfam, SMART, PROSITE, SUPERFAMILY), and assigns Gene Ontology (GO) terms and pathway annotations based on conserved protein signatures.
+InterProScan was executed using the InterProScan module available on the Saga (Sigma2) cluster (see Chapter 1 HPC module list [Chapter 1 README (HPC Modules section)](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/README.md#hpc-modules) for version details).
 
-This document provides script-level documentation for running InterProScan on the Trinity transcriptome in a modular and reproducible manner.
-
-InterProScan was used to annotate predicted proteins with domain signatures, GO terms, and InterPro accessions.
-IPS was run using the InterProScan module available on the Saga cluster.
-Because the dataset was large, the peptide FASTA was processed in chunks using SLURM array jobs.
-Per‑chunk IPS outputs were then merged into a single file for downstream Trinotate integration.
+Because of the dataset size, the peptide FASTA file was split into chunks and processed in parallel using SLURM array jobs on the Saga cluster. Per‑chunk outputs were subsequently merged into a single file for downstream integration with Trinotate.
 
 ---
 
@@ -20,8 +15,6 @@ Per‑chunk IPS outputs were then merged into a single file for downstream Trino
 1. [Chunking](#1-chunking)
 2. [IPS Execution](#2-ips-execution)
 3. [Extraction](#4-extraction)
-
-The execution environment used to run these steps is described in the [Execution Environment](#execution-environment) section.
 
 ---
 

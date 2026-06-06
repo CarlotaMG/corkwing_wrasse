@@ -1,43 +1,8 @@
 # Annotation
 
-## Overview
-
 This section describes the functional annotation workflow applied to the Trinity-assembled transcriptome. Multiple complementary annotation approaches were used to assign functional information to predicted transcripts, including transcriptome-based pipelines (EggNOG, InterProScan, Trinotate, SignalP, TMHMM), as well as genome-based annotation integrated via transcriptome–genome intersection.
 
-The workflow integrates these sources through comparison and merging to produce a unified annotation dataset for downstream analyses.
-
----
-
-## Directory Structure
-
-The annotation workflow and its outputs are organised as follows:
-
-```
-scripts/annotation/
-├── genome_based/      # Transcript–genome intersection and filtering
-├── eggnog/            # EggNOG functional annotation pipeline
-├── ips/               # InterProScan annotation pipeline
-└── trinotate/         # Trinotate annotation (BLAST, Pfam, GO, SignalP, TMHMM)
-
-results/annotation/
-├── genome_based/      # Transcript–genome intersection outputs and summaries
-├── eggnog/            # EggNOG annotation results
-├── ips/               # InterProScan outputs
-└── trinotate/         # Trinotate outputs
-    ├── go_extraction/     # Extracted GO annotations
-    ├── signalp/           # Signal peptide predictions
-    ├── tmhmm/             # Transmembrane helix predictions
-    └── trinotate_final/   # Final Trinotate annotation report
-```
-Most directories are created and populated by the corresponding scripts during execution, although some may need to be created beforehand. The directory structure is provided here to ensure that the workflow can be reproduced if needed. Script usage examples below illustrate the expected input and output paths.
-
-All scripts are designed to be executed from the `chapter1_rnaseq/` directory, and all paths shown here are relative to that location.
-
----
-
-## Workflow Structure
-
-The annotation workflow consists of three main components:
+The workflow integrates these sources through comparison and merging to produce a unified annotation dataset for downstream analyses and consists of three main components:
 
 1. Genome-based annotation  
 2. Transcriptome-based annotation  
@@ -108,8 +73,6 @@ The following was performed:
 Full analysis report (code, tables, plots, and interpretation):
 
 https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/annotations.html
-
----
 
 ### Environment
 
