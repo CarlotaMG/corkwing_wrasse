@@ -8,12 +8,12 @@ This repository contains scripts and results for RNA-seq analysis of *Symphodus 
 
 This chapter includes:
 
-- Guided de novo transcriptome assembly using Trinity  
-- Transcript annotation with Trinotate, EggNog, InterProScan and genome-based GFF integration  
+- Guided de novo transcriptome assembly using Tritiny  
 - PCA and clustering to visualize sample structure  
 - Model comparison to evaluate differential expression patterns and guide gene set selection  
 - Differential expression analyses across temperature treatments and pedigrees using DESeq2  
-- Selection of gene sets representing temperature-responsive, population-divergent, and hybrid inheritance  
+- Selection of gene sets representing temperature-responsive, population-divergent, and hybrid expression inheritance patterns (see [Differential Expression section](scripts/DE/README.md#gene-set-framework) for details).  
+- Functional annotation using transcriptome-based approaches and genome-based annotation integration  
 - Functional enrichment of gene sets to identify associated biological processes and pathways  
 
 ---
@@ -25,68 +25,6 @@ This chapter includes:
 3. **[Differential Expression](scripts/DE/README.md)**  
 4. **[Annotation](scripts/annotation/README.md)**  
 5. **[Functional Enrichment](scripts/functional_enrichment/README.md)**  
-
----
-
-## Differential Expression Framework
-
-Differential expression analysis identified gene expression patterns across temperature treatments and population origins. These results were used to define biologically meaningful gene sets based on shared, divergent, and hybrid-specific transcriptional responses.
-
-Candidate gene sets were grouped into three categories (referred to here as "tiers"):
-
-- **Tier 1: Shared temperature-responsive genes**
-  Genes consistently regulated by temperature across all origins. Defined by intersecting results from all pairwise temperature contrasts of the additive DE model.
-
-    *Biological rationale*: given their consistent regulation across populations, these genes are expected to represent conserved components of the temperature response.
-
-- **Tier 2: Divergence between West and South origins**
-  Constitutive differences between origins using the additive DE model
-
-    *Biological rationale*: represents baseline expression differences between populations, potentially reflecting underlying regulatory divergence.
-
-- **Tier 2b: Local thermal adaptation candidates**
-  Overlap between Tier 2 constitutive differences and genes with significant interaction effects.
-
-    *Biological rationale*: strongest candidates for local adaptation, combining constitutive divergence with origin-specific plasticity.
-
-- **Tier 3: Hybrid inheritance and misexpression**
-  Defined using the condition DE model at the isoform level. Categories include:
-  - Misexpression (within-range and transgressive)
-  - South-like inheritance
-  - West-like inheritance
-
-    *Biological rationale*: provides insight into how parental expression programs are maintained or disrupted in hybrids, highlighting regulatory incompatibilities.
-
----
-
-### Working Environment
-This analysis was conducted in a mixed computational environment combining HPC modules, containerized tools, and R-based analyses. Transcriptome assembly and annotation steps were performed each within their own Singularity container to ensure reproducibility.
-Most scripts in this repository are modular and can be executed locally or on Unix-based systems. However, several computationally intensive steps were run on the Saga (Sigma2) HPC cluster using SLURM and may require similar resources to reproduce.
-
-> SLURM job scripts used during analysis are not included in the repository to maintain clarity. Instead, modular scripts are documented with usage examples and can be integrated into SLURM workflows as needed.
-
-This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
-This modular design also facilitates adaptation of individual components of the workflow to other RNA-seq studies, allowing reuse of scripts and analytical steps beyond this specific dataset.
-
-#### HPC Modules
-The following environment modules were loaded on Saga (Sigma2 cluster):
-- FastQC/0.12.1-Java-11
-- MultiQC/1.22.3-foss-2023b
-- Trimmomatic/0.39-Java-11
-- STAR/2.7.10b-GCC-11.3.0
-- minimap2/2.26-GCCcore-12.3.0
-- SAMtools/1.18-GCC-12.3.0
-- BUSCO/5.5.0-foss-2022b
-- HMMER/3.4-gompi-2023a
-- BLAST+/2.14.1-gompi-2023a
-- Python/3.10.8-GCCcore-12.2.0
-- InterProScan/5.62-94.0-foss-2022a
-#### Special tools
-SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were integrated into annotation workflows.
-#### R-based analyses
-All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
-
-Details of container setup, module usage, external data resources and R sessions are documented in each section README.
 
 ---
 
@@ -115,8 +53,39 @@ chapter1_rnaseq/
 │   ├── sample_clustering/    # PCA analysis
 │   └── functional_enrichment/ # Functional enrichment
 ```
-All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
+All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location usin>
 
+---
+
+### Working Environment
+This analysis was conducted in a mixed computational environment combining HPC modules, containerized tools, and R-based analyses. Transcriptome assembly and annotation steps were performed each within their own Singularity container to ensure reproducibility.
+Most scripts in this repository are modular and can be executed locally or on Unix-based systems. However, several computationally intensive steps were run on the Saga (Sigma2) HPC cluster using SLURM and may require similar resources to reproduce.
+
+> SLURM job scripts used during analysis are not included in the repository to maintain clarity. Instead, modular scripts are documented with usage examples and can be integrated into SLURM workflows as needed.
+
+This design reflects the actual workflow used during analysis and supports reproducibility across HPC systems.
+This modular design also facilitates adaptation of individual components of the workflow to other RNA-seq studies, allowing reuse of scripts and analytical steps beyond this specific dataset.
+
+#### HPC Modules
+The following environment modules were loaded on Saga (Sigma2 cluster):
+- FastQC/0.12.1-Java-11
+- MultiQC/1.22.3-foss-2023b
+- Trimmomatic/0.39-Java-11
+- STAR/2.7.10b-GCC-11.3.0
+- minimap2/2.26-GCCcore-12.3.0
+- bedtools/2.30.0-GCCcore-12.3.0
+- SAMtools/1.18-GCC-12.3.0
+- BUSCO/5.5.0-foss-2022b
+- HMMER/3.4-gompi-2023a
+- BLAST+/2.14.1-gompi-2023a
+- Python/3.10.8-GCCcore-12.2.0
+- InterProScan/5.62-94.0-foss-2022a
+#### Special tools
+SignalP 6.0 (licensed DTU distribution) and DeepTMHMM (Apptainer image) were integrated into annotation workflows.
+#### R-based analyses
+All downstream analyses following assembly and annotation were conducted in R, with results documented in rendered HTML reports including visualizations, tables, and summary outputs
+
+Details of container setup, module usage, external data resources and R sessions are documented in each section README.
 
 ---
 

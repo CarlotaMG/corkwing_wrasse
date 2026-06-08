@@ -1,6 +1,6 @@
 # Functional Enrichment
 
-This step interprets gene expression patterns by identifying enriched functional categories and pathways across Tier 1, Tier 2, Tier 2b, and Tier 3 gene sets.
+This step interprets gene expression patterns by identifying enriched functional categories and pathways across Tier 1, Tier 2, Tier 2b, and Tier 3 gene sets (see [Differential Expression framework](../DE/README.md#gene-set-framework) for definitions).
 
 Functional enrichment integrates differential expression results with ortholog mapping and Gene Ontology (GO) and KEGG pathway databases to characterise the biological processes underlying temperature response, population divergence, and hybrid inheritance.
 

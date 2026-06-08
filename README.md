@@ -13,10 +13,10 @@ It includes:
 - Transcript annotation using Trinotate and genome-based GFF integration
 - Comparison of annotation sources
 - PCA and clustering to visualize sample structure
-- Model comparison to evaluate differential expression patterns and select models for transcript extraction across tiers.
+- Model comparison to evaluate differential expression patterns and select models for transcript extraction across tiers
 - Differential expression analysis across temperature and origin contrasts using DESeq2
-- Tiered transcript selection to identify temperature-responsive, locally adapted, and misexpressed candidate genes
-- Functional enrichment of tiered transcript sets to identify associated biological processes and pathways
+- Gene set selection to identify temperature-responsive, population-divergent, and hybrid gene expression inheritance patte	
+- Functional enrichment of gene sets to identify associated biological processes and pathways
  
 See full details in the [Chapter 1 README](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq).
 

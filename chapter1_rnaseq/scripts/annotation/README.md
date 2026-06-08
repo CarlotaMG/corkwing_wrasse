@@ -1,7 +1,6 @@
 # Annotation
 
-This section describes the functional annotation workflow applied to the Trinity-assembled transcriptome. Multiple complementary annotation approaches were used to assign functional information to predicted transcripts, including transcriptome-based pipelines (EggNOG, InterProScan, Trinotate, SignalP, TMHMM), as well as genome-based annotation integrated via transcriptome–genome intersection.
-
+This section describes the functional annotation workflow applied to the Trinity-assembled transcriptome. Multiple complementary approaches were used for functional annotation, combining transcript-level annotation (EggNOG-mapper, InterProScan, and Trinotate) with genome-based annotation integrated via transcriptome–genome intersection.
 The workflow integrates these sources through comparison and merging to produce a unified annotation dataset for downstream analyses and consists of three main components:
 
 1. Genome-based annotation  

@@ -1,4 +1,4 @@
-# Differential Expression
+ Differential Expression
 
 This step identifies gene expression patterns associated with temperature, population, and hybrid inheritance in *Symphodus melops*.
 
@@ -7,6 +7,26 @@ The workflow consists of three sequential analyses:
 1. Model comparison and variance partitioning  
 2. Differential expression analysis (Tier 1, Tier 2, Tier 2b)  
 3. Hybrid inheritance analysis (Tier 3)  
+
+---
+
+## Gene Set Framework
+
+Differential expression results were interpreted using a structured framework that groups genes into biologically meaningful categories based on their expression patterns across temperature treatments and population origins.
+
+Gene sets were defined as follows:
+
+- **Tier 1: Shared temperature-responsive genes**  
+  Genes consistently regulated by temperature across all origins.
+
+- **Tier 2: Population divergence**  
+  Genes with constitutive differences between western and southern populations.
+
+- **Tier 2b: Local thermal adaptation candidates**  
+  Genes showing both baseline divergence and temperature-dependent interaction effects.
+
+- **Tier 3: Hybrid expression inheritance**  
+  Genes classified based on hybrid expression patterns, including additive, parent-like, and misexpressed categories.
 
 ---
 
@@ -88,4 +108,4 @@ https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/Tier3_DE.
 
 ## Environment
 
-Each analysis documents its required libraries and package versions within the corresponding results report.
+Each analysis documents its required libraries and package versions within the corresponding analysis report.
