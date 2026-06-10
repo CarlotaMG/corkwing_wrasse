@@ -1,4 +1,4 @@
- Differential Expression
+# Differential Expression
 
 This step identifies gene expression patterns associated with temperature, population, and hybrid inheritance in *Symphodus melops*.
 
@@ -17,16 +17,16 @@ Differential expression results were interpreted using a structured framework th
 Gene sets were defined as follows:
 
 - **Tier 1: Shared temperature-responsive genes**  
-  Genes consistently regulated by temperature across all origins.
+  Genes that show consistent expression changes with temperature, representing a shared response across populations.
 
 - **Tier 2: Population divergence**  
-  Genes with constitutive differences between western and southern populations.
+  Genes that consistently differ in expression between western and southern populations across temperature conditions.
 
 - **Tier 2b: Local thermal adaptation candidates**  
-  Genes showing both baseline divergence and temperature-dependent interaction effects.
+  Genes that differ between western and southern populations and show population-specific responses to temperature.
 
 - **Tier 3: Hybrid expression inheritance**  
-  Genes classified based on hybrid expression patterns, including additive, parent-like, and misexpressed categories.
+  Genes showing how hybrid expression relates to parental populations, including parent-like inheritance and misexpression.
 
 ---
 
