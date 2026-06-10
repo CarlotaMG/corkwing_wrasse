@@ -5,8 +5,8 @@ This step identifies gene expression patterns associated with temperature, popul
 The workflow consists of three sequential analyses:
 
 1. Model comparison and variance partitioning  
-2. Differential expression analysis (Tier 1, Tier 2, Tier 2b)  
-3. Hybrid inheritance analysis (Tier 3)  
+2. Differential expression analysis  
+3. Hybrid inheritance analysis  
 
 ---
 
