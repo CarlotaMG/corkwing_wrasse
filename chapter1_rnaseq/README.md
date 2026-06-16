@@ -42,7 +42,7 @@ chapter1_rnaseq/
 ├── results/                  # Outputs generated across analysis stages
 │   ├── assembly/             # Transcriptome assembly and quantification outputs
 │   ├── annotation/           # Functional annotation outputs (Trinotate, EggNOG, etc.)
-│   ├── DE/                   # Differential expression results (tiers, tables and visualizations)
+│   ├── DE/                   # Differential expression results (tables and visualizations)
 │   ├── sample_clustering/    # PCA and clustering results (plots and distance metrics)
 │   └── functional_enrichment/ # Functional enrichment results across tiers
 │
