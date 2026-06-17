@@ -53,7 +53,9 @@ chapter1_rnaseq/
 │   ├── sample_clustering/    # PCA analysis
 │   └── functional_enrichment/ # Functional enrichment
 ```
+
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
+
 ---
 
 ### Working Environment
