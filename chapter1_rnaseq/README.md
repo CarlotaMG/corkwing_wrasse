@@ -44,7 +44,7 @@ chapter1_rnaseq/
 │   ├── annotation/           # Functional annotation outputs (Trinotate, EggNOG, etc.)
 │   ├── DE/                   # Differential expression results (tables and visualizations)
 │   ├── sample_clustering/    # PCA and clustering results (plots and distance metrics)
-│   └── functional_enrichment/ # Functional enrichment results across tiers
+│   └── functional_enrichment/ # Functional enrichment results (tables and visualizations)
 │
 ├── scripts/                  # Modular analysis workflows
 │   ├── assembly/             # Transcriptome assembly
@@ -53,8 +53,7 @@ chapter1_rnaseq/
 │   ├── sample_clustering/    # PCA analysis
 │   └── functional_enrichment/ # Functional enrichment
 ```
-All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location usin>
-
+All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
 ---
 
 ### Working Environment
