@@ -902,27 +902,6 @@ DT::datatable(
 ```
 
 
-## Summary of annotation coverage for intersected gene sets.
-```{r}
-# Add annotation status
-intersection_genes_df$Has_Annotation <- intersection_genes_df$Gene_ID %in% universe_genes
-
-# Summary of annotation coverage
-annotation_status_summary <- intersection_genes_df %>%
-  dplyr::group_by(Intersection) %>%
-  dplyr::summarise(
-    Total_Genes = n(),
-    Annotated = sum(Has_Annotation),
-    Percent_Annotated = round(Annotated / Total_Genes * 100, 2)
-  )
-
-DT::datatable(
-  annotation_status_summary,
-  options = list(pageLength = 10, scrollX = TRUE),
-  caption = "Annotation Coverage for Intersected Gene Sets"
-)
-```
-
 ## Session Info
 ```{r session_info} 
 sessionInfo()

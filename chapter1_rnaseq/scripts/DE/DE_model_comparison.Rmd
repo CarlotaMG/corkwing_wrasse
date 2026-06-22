@@ -66,6 +66,7 @@ knitr::kable(sample_info, caption = "Sample metadata")
 
 ```
 
+
 ## Prepare abundance matrix
 ```{r prep_abundance_matrix}
 
@@ -119,7 +120,7 @@ res_length_vs_add <- results(dds_lrt_length_vs_add, alpha = 0.05)
 summary(res_length_vs_add)
 ```
 
-The likelihood ratio test comparing the additive model with and without length identified 6,900 genes where body size explained significant variation. Because body size serves as a proxy for developmental stage, we included length as a covariate in all subsequent models. This ensures that observed effects in condition, additive, and interaction analyses reflect biological factors of interest rather than developmental differences
+The likelihood ratio test comparing the additive model with and without length identified 6,900 genes where body size explained significant variation. Because body size serves as a proxy for developmental stage, we included length as a covariate in all subsequent models. This ensures that observed effects in condition, additive, and interaction analyses reflect biological factors of interest rather than developmental differences.
 
 
 ## Run DESeq2 for full model

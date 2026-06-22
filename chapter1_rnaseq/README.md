@@ -74,7 +74,7 @@ The following environment modules were loaded on Saga (Sigma2 cluster):
 - Trimmomatic/0.39-Java-11
 - STAR/2.7.10b-GCC-11.3.0
 - minimap2/2.26-GCCcore-12.3.0
-- bedtools/2.30.0-GCCcore-12.3.0
+- BEDTools/2.30.0-GCC-12.2.0
 - SAMtools/1.18-GCC-12.3.0
 - BUSCO/5.5.0-foss-2022b
 - HMMER/3.4-gompi-2023a
