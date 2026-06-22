@@ -102,7 +102,7 @@ This analysis characterises hybrid gene expression patterns by assigning genes t
 
 Full analysis report (code, plots, and summary tables):  
 
-https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/Tier3_DE.html  
+https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/tier3_DE.html  
 
 ---
 
