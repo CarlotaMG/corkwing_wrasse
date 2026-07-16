@@ -114,37 +114,90 @@ results/annotation/trinotate/blastp
 ---
 
 ## 3. Pfam
-[pfam.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam.sh)
+Pfam domain annotation was performed using HMMER (hmmscan) against the Pfam-A database. Because the peptide dataset was large, the translated ORFs were split into chunks and processed in parallel using SLURM array jobs. Per-chunk domain tables were then merged into a single file for downstream use for Transdecoder. 
 
-Runs hmmscan on predicted peptide sequences to identify conserved protein domains. The script takes a peptide FASTA file, a Singularity image, a desired filename for the Pfam-A HMM file, an output directory, and the number of threads to use. If the HMM file is missing, it is downloaded and decompressed. The script then builds the HMM database using hmmpress and scans the peptide sequences with hmmscan.
+[pfam_prepare.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam_prepare.sh)
+
+Downloads the Pfam-A HMM database if it is not already available and prepares it for HMMER searches by generating the required index files with `hmmpress`.
+
 ##### Inputs
-- Predicted peptide sequences (e.g., longest_orfs.pep)
+- Pfam-A HMM database file
+- Trinotate Singularity image
 ##### Outputs
-- Domain table output (pfam.domtblout)
-- Pfam-A HMM file (e.g., Pfam-A_2025_10.hmm)
-- Pfam HMM index files (.h3f, .h3i, .h3m, .h3p)
+- Pfam-A HMM database
+- HMMER index files (.h3f, .h3i, .h3m, .h3p)
+Downloads the Pfam-A database if necessary and prepares it for searching by generating HMMER index files using hmmpress.
 ##### Usage
 ```bash
-bash scripts/annotation/trinotate/pfam.sh \
-<pep_file> \
-<singularity_image> \
-<pfam_hmm> \
-<output_dir> \
-<threads>
+bash pfam_prepare.sh <pfam_hmm> <singularity_image>
 ```
 ##### Example
 ```bash
-bash scripts/annotation/trinotate/pfam.sh \
-results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
-resources/trinotate.v4.0.2.simg \
-resources/pfam/Pfam-A_2025_10.hmm \
-results/annotation/trinotate/pfam \
-16
+bash scripts/annotation/trinotate/pfam_prepare.sh \
+    resources/pfam/Pfam-A_2025_10.hmm \
+    resources/trinotate.v4.0.2.simg
 ```
 
-##### Post-run
+⸺
+
+[pfam_chunking.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam_chunking.sh)
+
+Splits a large peptide FASTA file into smaller chunks (~5,000 sequences each) to enable parallel execution on the HPC.
+
+##### Inputs
+- Peptide FASTA file (e.g., longest_orfs.pep)
+##### Outputs
+- chunk_000/chunk_000.pep 
+- chunk_001/chunk_001.pep 
+- … one directory per chunk
+##### Usage
 ```bash
-cat results/annotation/trinotate/pfam/chunks/*/*.domtblout > /results/annotation/trinotate/pfam/pfam_merged.domtblout
+bash pfam_chunking.sh <pep_file> <output_dir>
+```
+##### Example
+```bash
+bash scripts/annotation/trinotate/pfam_chunking.sh \
+    results/annotation/trinotate/transdecoder_longorfs/longest_orfs.pep \
+    results/annotation/trinotate/pfam/chunks
+```
+
+⸺
+
+[pfam_localcopy.sh](https://github.com/CarlotaMG/corkwing_wrasse/blob/main/chapter1_rnaseq/scripts/annotation/trinotate/pfam_localcopy.sh)
+
+Runs hmmscan on a single peptide FASTA chunk against the Pfam-A database. If node-local scratch storage is available, the Pfam database and associated index files are copied there to improve performance and reduce I/O bottlenecks.
+
+##### Inputs 
+- Peptide FASTA chunk (e.g., chunk_074.pep) 
+- Pfam-A HMM database (e.g., Pfam-A_2025_10.hmm) 
+##### Outputs 
+- Pfam domain table (e.g., chunk_074.domtblout) 
+##### Usage 
+```bash 
+bash pfam_localcopy.sh \ <pep_file> \ <pfam_hmm> \ <output_file> \ <threads>
+```
+##### Example(SLURM array job)
+```bash
+# Format array index to match chunk naming
+TASK_ID=$(printf "%03d" "$SLURM_ARRAY_TASK_ID")
+
+# Define input peptide FASTA and output file for this chunk
+PEP_FILE="results/annotation/trinotate/pfam/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.pep"
+OUT_FILE="results/annotation/trinotate/pfam/chunks/chunk_${TASK_ID}/chunk_${TASK_ID}.domtblout"
+PFAM_DB="resources/pfam/Pfam-A_2025_10.hmm"
+
+# Run hmmscan
+bash scripts/annotation/trinotate/pfam_localcopy.sh \
+    "$PEP_FILE" \
+    "$PFAM_DB" \
+    "$OUT_FILE" \
+    "$SLURM_CPUS_PER_TASK"
+```
+
+After all array tasks finished, all per-chunk Pfam outputs were merged into a single file:
+```bash
+cat results/annotation/trinotate/pfam/chunks/*/*.domtblout \
+    > results/annotation/trinotate/pfam/pfam_merged.domtblout
 ```
 
 ---
