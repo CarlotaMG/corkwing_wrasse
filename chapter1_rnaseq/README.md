@@ -45,7 +45,7 @@ chapter1_rnaseq/
 │   ├── DE/                   # Differential expression results (tables and visualizations)
 │   ├── sample_clustering/    # PCA and clustering results (plots and distance metrics)
 │   ├── functional_enrichment/ # Functional enrichment results (tables and visualizations)
-│   └── transcriptomic_trajectories/ # Expression trajectories results (tables and plots)
+│   └── expression_trajectories/ # Expression trajectories results (tables and plots)
 │
 ├── scripts/                  # Modular analysis workflows
 │   ├── assembly/             # Transcriptome assembly
