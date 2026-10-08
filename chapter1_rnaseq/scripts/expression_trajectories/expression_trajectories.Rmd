@@ -1,0 +1,2521 @@
+---
+title: "Transcriptomic trajectories"
+author: "Carlota Myhre de Gouveia"
+date: "2026-31-08"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
+```
+
+# Transcriptomic trajectories
+## Introduction
+
+This report examines transcriptional trajectories across temperature treatments in Western, Southern, and Hybrid corkwing wrasse. First, principal component analysis (PCA) was used to visualize transcriptomic trajectories across temperatures for the whole transcriptome and focal gene sets. Second, unsupervised hierarchical clustering was used to identify major classes of gene-level expression trajectories within each gene set. Finally, South-West expression divergence was quantified across temperatures to evaluate how parental transcriptional differentiation changes across the thermal gradient.
+
+
+## Package Loading
+```{r packages}
+
+suppressPackageStartupMessages({
+	library(DESeq2)
+	library(tidyverse)
+	library(here)
+	library(ggplot2)
+	library(RColorBrewer)
+	library(scales)
+	library(readxl)
+	library(cluster)
+	library(readr)
+	library(dplyr)
+})
+  
+```
+
+## Data Import and Preprocessing
+```{r load_data}
+# Load transcript abundance matrix
+abundance_matrix <- read.table(
+  "data/DE/abundance_matrix.txt",
+  header = TRUE,
+  row.names = 1,
+  check.names = FALSE
+)
+
+# Simplify sample names
+colnames(abundance_matrix) <- sub(
+  ".*Melops",
+  "",
+  colnames(abundance_matrix)
+)
+
+# Import metadata
+sample_info <- read_excel(
+  "data/sample_conditions_rnaseq.xlsx"
+) %>%
+  mutate(
+    sample = sub("L", "", RNA_Later_ID),
+    origin = factor(
+      Origin,
+      levels = c("W", "H", "S")
+    ),
+    temperature = factor(
+      `Temperature (celsius)`,
+      levels = c(12, 15, 18)
+    ),
+    condition = factor(
+      RNAseqgroup,
+      levels = c(
+        "W12", "W15", "W18",
+        "H12", "H15", "H18",
+        "S12", "S15", "S18"
+      )
+    ),
+    length = scale(`Total length (mm)`)
+  ) %>%
+  select(
+    sample,
+    origin,
+    temperature,
+    condition,
+    length
+  )
+
+# Reorder metadata to match count matrix
+sample_info <- sample_info %>%
+  arrange(
+    match(
+      sample,
+      colnames(abundance_matrix)
+    )
+  )
+
+# Load gene sets
+# Tier 1 genes
+tier1_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier1_shared_temperature_response/tier1_shared_temperature_genes.csv"
+  )$gene_id
+)
+
+# Tier 2 genes
+tier2_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier2_pop_divergence/tier2_pop_divergence_genes.csv"
+  )$gene_id
+)
+
+# Interaction genes
+interaction_genes <- read.csv(
+  "results/DE/interaction_effects/significant_interaction_genes.csv"
+)$transcript_id
+
+# Tier 2b genes
+tier2b_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv"
+  )$gene_id
+)
+
+# Tier 3 misexpressed genes
+tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier3_hybrid_inheritance/tier3_misexpressed_genes.csv"
+  )$gene_id
+)
+
+# Tier 1 ∩ Tier 3 misexpressed genes
+tier1_tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier_intersections/tier1_tier3_misexpressed.csv"
+  )$gene_id
+)
+
+# Tier 2b ∩ Tier 3 misexpressed genes
+tier2b_tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier_intersections/tier2b_tier3_misexpressed.csv"
+  )$gene_id
+)
+
+# Summarize gene-set sizes
+gene_set_sizes <- tibble(
+  Gene_Set = c(
+    "Tier 1",
+    "Tier 2",
+    "Interaction genes",
+    "Tier 2b",
+    "Tier 3 Misexpressed",
+    "Tier1 ∩ Tier3 Misexpr",
+    "Tier2b ∩ Tier3 Misexpr"
+  ),
+  N_Genes = c(
+    length(tier1_genes),
+    length(tier2_genes),
+    length(interaction_genes),
+    length(tier2b_genes),
+    length(tier3_mis_genes),
+    length(tier1_tier3_mis_genes),
+    length(tier2b_tier3_mis_genes)
+  )
+)
+
+# Display gene-set sizes
+knitr::kable(
+  gene_set_sizes,
+  caption = "Gene-set sizes used for trajectory analyses"
+)
+
+# Show preview of the abundance matrix
+knitr::kable(
+  abundance_matrix[1:10, 1:10],
+  caption = "Gene abundance matrix (first 10 genes × 10 samples)"
+)
+
+# Show metadata
+knitr::kable(
+  sample_info,
+  caption = "Sample metadata"
+)
+
+# Load integrated annotation table
+annotations <- read_csv(
+  "results/annotation/annotations.csv",
+  show_col_types = FALSE
+)
+```
+
+## Trajectory helper functions
+```{r trajectory_function}
+
+# Define colour palettes
+temperature_colors <- c(
+  "12°C" = "#4C78A8",
+  "15°C" = "#e6ab02",
+  "18°C" = "#E45756"
+)
+
+origin_colors <- c(
+  "W" = "#8da0cb",
+  "H" = "#66c2a5",
+  "S" = "#fc8d62"
+)
+
+# Calculate PCA trajectories for gene sets
+calculate_pca_trajectory <- function(
+    expr,
+    metadata,
+    title_text
+) {
+
+  # Ensure metadata contains sample IDs
+  metadata$sample <- rownames(metadata)
+
+  # Run PCA
+  pca <- prcomp(
+    t(expr),
+    center = TRUE,
+    scale. = FALSE
+  )
+
+  # Extract PCA coordinates
+  pca_df <- as.data.frame(
+    pca$x[, 1:2]
+  )
+
+  pca_df$sample <- rownames(
+    pca_df
+  )
+
+  # Add metadata
+  pca_df <- left_join(
+    pca_df,
+    metadata,
+    by = "sample"
+  )
+
+  # Temperature labels
+  pca_df$temperature_label <- factor(
+    paste0(
+      pca_df$temperature,
+      "°C"
+    ),
+    levels = c(
+      "12°C",
+      "15°C",
+      "18°C"
+    )
+  )
+
+  # Percentage variance explained
+  percent_var <- round(
+    100 * (
+      pca$sdev^2 /
+      sum(pca$sdev^2)
+    ),
+    1
+  )
+
+  # Calculate group centroids
+  trajectory_df <- pca_df %>%
+    group_by(
+      origin,
+      temperature,
+      temperature_label
+    ) %>%
+    summarise(
+      PC1 = mean(PC1),
+      PC2 = mean(PC2),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    arrange(
+      origin,
+      temperature
+    )
+
+  # Plot trajectory
+  p <- ggplot(
+    trajectory_df,
+    aes(
+      x = PC1,
+      y = PC2,
+      group = origin
+    )
+  ) +
+    geom_path(
+      aes(colour = origin),
+      linewidth = 1.2,
+      arrow = arrow(
+        length = unit(
+          0.2,
+          "cm"
+        )
+      )
+    ) +
+    geom_point(
+      aes(fill = temperature_label),
+      shape = 21,
+      size = 4,
+      colour = "black",
+      stroke = 0.8
+    ) +
+    geom_text(
+      aes(
+        label = temperature_label
+      ),
+      vjust = -1,
+      size = 4
+    ) +
+    scale_colour_manual(
+      values = origin_colors
+    ) +
+    scale_fill_manual(
+      values = temperature_colors
+    ) +
+    labs(
+      title = title_text,
+      x = paste0(
+        "PC1 (",
+        percent_var[1],
+        "% variance)"
+      ),
+      y = paste0(
+        "PC2 (",
+        percent_var[2],
+        "% variance)"
+      )
+    ) +
+    theme_minimal(
+      base_size = 14
+    ) +
+    theme(
+      legend.position = "none"
+    )
+
+  print(p)
+
+  # Calculate trajectory distances
+  distances <- trajectory_df %>%
+    group_by(origin) %>%
+    summarise(
+
+      Dist_12_15 =
+        sqrt(
+          (PC1[temperature == 15] -
+             PC1[temperature == 12])^2 +
+          (PC2[temperature == 15] -
+             PC2[temperature == 12])^2
+        ),
+
+      Dist_15_18 =
+        sqrt(
+          (PC1[temperature == 18] -
+             PC1[temperature == 15])^2 +
+          (PC2[temperature == 18] -
+             PC2[temperature == 15])^2
+        ),
+
+      Dist_12_18 =
+        sqrt(
+          (PC1[temperature == 18] -
+             PC1[temperature == 12])^2 +
+          (PC2[temperature == 18] -
+             PC2[temperature == 12])^2
+        ),
+
+      Ratio_15_18_to_12_15 =
+        Dist_15_18 /
+        Dist_12_15,
+
+      .groups = "drop"
+    )
+
+  # Return everything needed downstream
+  return(
+    list(
+      pca = pca,
+      plot = p,
+      plot_data = trajectory_df,
+      distances = distances
+    )
+  )
+}
+
+# Plot individual-gene trajectories
+plot_gene_trajectory <- function(
+    gene_ids,
+    expr_matrix,
+    metadata,
+    origin_colors,
+    save_plot = FALSE,
+    save_dir = "results/transcriptomic_trajectories/individual_genes"
+) {
+
+  metadata$sample <- rownames(metadata)
+
+  gene_ids <- intersect(
+    gene_ids,
+    rownames(expr_matrix)
+  )
+
+  if (length(gene_ids) == 0) {
+
+    stop(
+      "No genes found in expression matrix."
+    )
+
+  }
+
+  if (save_plot) {
+
+    dir.create(
+      save_dir,
+      recursive = TRUE,
+      showWarnings = FALSE
+    )
+
+  }
+
+  for (gene_id in gene_ids) {
+
+    gene_df <- data.frame(
+      sample = colnames(expr_matrix),
+      Expression = as.numeric(
+        expr_matrix[gene_id, ]
+      )
+    ) %>%
+      left_join(
+        metadata,
+        by = "sample"
+      )
+
+    gene_summary <- gene_df %>%
+      group_by(
+        origin,
+        temperature
+      ) %>%
+      summarise(
+        Mean_Expression = mean(Expression),
+        SD = sd(
+          Expression,
+          na.rm = TRUE
+        ),
+        N = n(),
+        .groups = "drop"
+      )
+
+    p <- ggplot(
+      gene_summary,
+      aes(
+        x = temperature,
+        y = Mean_Expression,
+        colour = origin,
+        group = origin
+      )
+    ) +
+      geom_line(
+        linewidth = 1.2
+      ) +
+      geom_point(
+        size = 3
+      ) +
+      geom_errorbar(
+        aes(
+          ymin = Mean_Expression - SD,
+          ymax = Mean_Expression + SD
+        ),
+        width = 0.1
+      ) +
+      scale_colour_manual(
+        values = origin_colors
+      ) +
+      labs(
+        title = gene_id,
+        x = "Temperature (°C)",
+        y = "VST expression"
+      ) +
+      theme_minimal(
+        base_size = 14
+      )
+
+    print(p)
+
+    if (save_plot) {
+
+      ggsave(
+        filename = file.path(
+          save_dir,
+          paste0(
+            gene_id,
+            "_trajectory.png"
+          )
+        ),
+        plot = p,
+        width = 8,
+        height = 6,
+        dpi = 300
+      )
+
+    }
+
+  }
+
+}
+```
+
+## Prepare abundance matrix
+```{r prep_abundance_matrix}
+# Ensure non-negative integer counts
+abundance_matrix <- round(
+  pmax(abundance_matrix, 0)
+)
+
+# Keep transcripts with total count ≥ 10 across all samples
+keep_genes <- rowSums(
+  abundance_matrix
+) >= 10
+
+abundance_matrix <- abundance_matrix[
+  keep_genes,
+]
+
+# Whole transcriptome genes retained after filtering
+whole_transcriptome_genes <- rownames(
+  abundance_matrix
+)
+```
+
+## Create DESeq2 dataset
+```{r create_deseq_dataset}
+# Create DESeq2 dataset
+dds <- DESeqDataSetFromMatrix(
+  countData = abundance_matrix,
+  colData   = sample_info,
+  design    = ~ temperature * origin + length
+)
+```
+
+## Variance-stabilizing transformation
+```{r vst_transformation}
+# Generate variance-stabilized counts
+vsd <- vst(
+  dds,
+  blind = FALSE
+)
+
+# Extract expression matrix
+expr_matrix <- assay(vsd)
+
+# Extract metadata
+metadata <- as.data.frame(
+  colData(vsd)
+)
+
+# Ensure factors are ordered correctly
+metadata$origin <- factor(
+  metadata$origin,
+  levels = c("W", "H", "S")
+)
+
+metadata$temperature <- factor(
+  metadata$temperature,
+  levels = c(12, 15, 18)
+)
+```
+
+
+## Whole-transcriptome PCA trajectory
+```{r transcriptome_trajectory, fig.width=8, fig.height=6}
+
+whole_transcriptome_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix,
+    metadata = metadata,
+    title_text = "Whole-transcriptome trajectory"
+  )
+
+knitr::kable(
+  whole_transcriptome_results$distances,
+  digits = 3,
+  caption = "Whole-transcriptome trajectory distances in PCA space"
+)
+
+```
+Whole-transcriptome trajectory analyses revealed contrasting transcriptomic responses among origins. Western fish exhibited progressive transcriptomic divergence across the temperature gradient, with the largest net displacement observed between 12°C and 18°C. Hybrid fish followed a broadly similar trajectory, showing continued divergence from the 12°C state, although the magnitude of change was smaller than in Western fish. In contrast, Southern fish displayed a distinct trajectory characterized by a large shift between 12°C and 15°C followed by movement back toward the 12°C transcriptomic state at 18°C. This pattern is consistent with downstream differential expression analyses, which identified evidence for a more transient transcriptional response in Southern fish.
+
+## Tier 1 trajectory
+```{r tier1_trajectory, fig.width=8, fig.height=6}
+
+tier1_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        tier1_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Tier 1 trajectory"
+  )
+
+knitr::kable(
+  tier1_results$distances,
+  digits = 3,
+  caption = "Tier 1 trajectory distances in PCA space"
+)
+
+```
+Tier 1 trajectories broadly recapitulated the whole-transcriptome pattern, although separation among origins was reduced and the Southern trajectory exhibited a less pronounced return toward the 12°C state.
+
+## Tier 2 trajectories 
+```{r tier2_trajectory, fig.width=8, fig.height=6}
+
+tier2_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        tier2_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Tier 2 trajectory"
+  )
+
+knitr::kable(
+  tier2_results$distances,
+  digits = 3,
+  caption = "Tier 2 trajectory distances in PCA space"
+)
+
+```
+	Tier 2 trajectories exhibited strong separation among origins, consistent with their definition as population-divergence genes. Hybrids occupied an intermediate position between the parental populations while displaying reduced transcriptomic displacement across the temperature gradient. The Southern trajectory showed a pronounced return toward the 12°C state, even more strongly than observed at the whole-transcriptome level.
+
+## Interaction genes trajectories 
+```{r interaction_trajectory, fig.width=8, fig.height=6}
+
+interaction_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        interaction_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Interaction genes trajectory"
+  )
+
+knitr::kable(
+  interaction_results$distances,
+  digits = 3,
+  caption = "Interaction-gene trajectory distances in PCA space"
+)
+
+```
+Interaction genes retained evidence of a Southern trajectory reversal, although separation among origins was weaker than in the whole transcriptome.
+
+## Tier 2b trajectories 
+```{r tier2b_trajectory, fig.width=8, fig.height=6}
+
+tier2b_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        tier2b_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Tier 2b trajectory"
+  )
+
+knitr::kable(
+  tier2b_results$distances,
+  digits = 3,
+  caption = "Tier 2b trajectory distances in PCA space"
+)
+
+```
+Tier 2b trajectories combined relatively strong separation among origins with a pronounced Southern trajectory reversal. Origin separation appeared greater than in the whole transcriptome but weaker than in Tier 2, consistent with Tier 2b representing a subset of Tier 2 population-divergence genes.
+
+## Tier 3 misexpressed trajectories 
+```{r tier3_trajectory, fig.width=8, fig.height=6}
+
+tier3_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        tier3_mis_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Tier 3 Misexpressed trajectory"
+  )
+
+knitr::kable(
+  tier3_results$distances,
+  digits = 3,
+  caption = "Tier 3 misexpressed trajectory distances in PCA space"
+)
+
+```
+Tier 3 trajectories showed substantial overlap among origins but retained a pronounced Southern trajectory reversal.
+
+## Tier 1 ∩ Tier 3 Misexpressed trajectories 
+```{r tier1_tier3_trajectory, fig.width=8, fig.height=6}
+
+tier1_tier3_results <-
+  calculate_pca_trajectory(
+    expr = expr_matrix[
+      intersect(
+        tier1_tier3_mis_genes,
+        rownames(expr_matrix)
+      ),
+    ],
+    metadata = metadata,
+    title_text = "Tier 1 ∩ Tier 3 Misexpressed trajectory"
+  )
+
+knitr::kable(
+  tier1_tier3_results$distances,
+  digits = 3,
+  caption = "Tier 1 ∩ Tier 3 misexpressed trajectory distances in PCA space"
+)
+
+```
+The Tier 1 ∩ Tier 3 overlap exhibited a stronger Southern trajectory reversal than the broader Tier 1 gene set and more closely resembled the Tier 3 misexpressed gene set. 
+
+#### PCA TRAJECTORY GEOMETRY SUMMARY
+```{r summarise_pca_trajectory}
+summarise_pca_trajectory <- function(result, dataset_name){
+
+  # Variance explained
+  var_exp <- round(
+    100 * result$pca$sdev^2 / sum(result$pca$sdev^2),
+    2
+  )
+
+  # PCA coordinates
+  df <- result$plot_data
+
+  geom <- df %>%
+    group_by(origin) %>%
+    summarise(
+      x12 = PC1[temperature == 12],
+      y12 = PC2[temperature == 12],
+      x15 = PC1[temperature == 15],
+      y15 = PC2[temperature == 15],
+      x18 = PC1[temperature == 18],
+      y18 = PC2[temperature == 18],
+      .groups = "drop"
+    ) %>%
+    rowwise() %>%
+    mutate(
+
+      # trajectory vectors
+      vx1 = x15 - x12,
+      vy1 = y15 - y12,
+
+      vx2 = x18 - x15,
+      vy2 = y18 - y15,
+
+      len1 = sqrt(vx1^2 + vy1^2),
+      len2 = sqrt(vx2^2 + vy2^2),
+
+      # angle between segments
+      Angle_Degrees =
+        acos(
+          pmax(
+            -1,
+            pmin(
+              1,
+              (vx1 * vx2 + vy1 * vy2) /
+                (len1 * len2)
+            )
+          )
+        ) * 180 / pi,
+
+      # net displacement
+      Dist_12_18 =
+        sqrt(
+          (x18 - x12)^2 +
+          (y18 - y12)^2
+        ),
+
+      # lower values indicate stronger return
+      Return_Index =
+        Dist_12_18 / len1
+    ) %>%
+    ungroup() %>%
+    mutate(
+      Dataset = dataset_name,
+      PC1_Variance = var_exp[1],
+      PC2_Variance = var_exp[2],
+      PC1_PC2_Total = var_exp[1] + var_exp[2]
+    ) %>%
+    select(
+      Dataset,
+      origin,
+      PC1_Variance,
+      PC2_Variance,
+      PC1_PC2_Total,
+      Angle_Degrees,
+      Dist_12_18,
+      Return_Index
+    )
+
+  return(geom)
+}
+
+trajectory_summary <- bind_rows(
+
+  summarise_pca_trajectory(
+    whole_transcriptome_results,
+    "Whole transcriptome"
+  ),
+
+  summarise_pca_trajectory(
+    tier1_results,
+    "Tier 1"
+  ),
+
+  summarise_pca_trajectory(
+    tier2_results,
+    "Tier 2"
+  ),
+
+  summarise_pca_trajectory(
+    interaction_results,
+    "Interaction genes"
+  ),
+
+  summarise_pca_trajectory(
+    tier2b_results,
+    "Tier 2b"
+  ),
+
+  summarise_pca_trajectory(
+    tier3_results,
+    "Tier 3 Misexpressed"
+  ),
+
+  summarise_pca_trajectory(
+    tier1_tier3_results,
+    "Tier1 ∩ Tier3 Misexpressed"
+  )
+
+)
+
+knitr::kable(
+  trajectory_summary,
+  digits = 3,
+  caption = "PCA trajectory geometry and variance summary"
+)
+
+```
+
+The whole-transcriptome PCA revealed a distinct Southern transcriptional response to temperature, characterized by movement away from the 12°C transcriptomic state at 15°C followed by partial return toward the 12°C state at 18°C. This recovery pattern was also observed across all focal gene sets, indicating that it represents a pervasive feature of the Southern response to temperature. Hybrid trajectories generally resembled those of Western fish but exhibited reduced transcriptomic displacement across the temperature gradient. In addition, Tier 2 and Tier 2b gene sets exhibited visually distinct origin-specific trajectories, consistent with their definitions as genes showing population divergence between Southern and Western populations.
+The magnitude of the Southern trajectory reversal varied among gene sets and closely reflected their biological definitions. Tier 1 genes exhibited the weakest Southern trajectory reversal among all gene sets. Because Tier 1 genes were defined as conserved temperature-responsive transcripts shared across origins, this finding suggests that the Southern recovery pattern, although still clearly present, is less pronounced among genes contributing to the core thermal-response program shared between populations.
+Tier 2 population-divergence genes exhibited a Southern trajectory reversal similar to that observed across the whole transcriptome. Because these genes were identified based on differential expression between Southern and Western populations, the absence of a stronger reversal signal suggests that the Southern recovery pattern alone is unlikely to account for the differential expression observed between parental populations.
+In contrast, the strongest reversals were observed among interaction genes and Tier 2b local adaptation candidates. Because both gene sets were defined by origin-specific thermal responses, this pattern is consistent with the Southern recovery response representing a Southern-specific strategy for responding to temperature.
+Tier 3 misexpressed genes also exhibited relatively strong trajectory reversal, suggesting an association between the distinctive Southern recovery response and patterns of hybrid misexpression.
+The Tier 1 ∩ Tier 3 overlap exhibited a stronger Southern trajectory reversal than the broader Tier 1 gene set and more closely resembled the Tier 3 misexpressed gene set. This finding further supports an association between the Southern recovery response and hybrid misexpression.
+
+
+```{r}
+# ============================================================
+# PCA GEOMETRY + VARIANCE SUMMARY FOR ALL TRAJECTORIES
+# ============================================================
+
+summarise_pca_trajectory <- function(result, dataset_name){
+
+  # Variance explained
+  var_exp <- round(
+    100 * result$pca$sdev^2 / sum(result$pca$sdev^2),
+    2
+  )
+
+  # PCA coordinates
+  df <- result$plot_data
+
+  geom <- df %>%
+    group_by(origin) %>%
+    summarise(
+      x12 = PC1[temperature == 12],
+      y12 = PC2[temperature == 12],
+      x15 = PC1[temperature == 15],
+      y15 = PC2[temperature == 15],
+      x18 = PC1[temperature == 18],
+      y18 = PC2[temperature == 18],
+      .groups = "drop"
+    ) %>%
+    rowwise() %>%
+    mutate(
+
+      # trajectory vectors
+      vx1 = x15 - x12,
+      vy1 = y15 - y12,
+
+      vx2 = x18 - x15,
+      vy2 = y18 - y15,
+
+      len1 = sqrt(vx1^2 + vy1^2),
+      len2 = sqrt(vx2^2 + vy2^2),
+
+      # angle between segments
+      Angle_Degrees =
+        acos(
+          pmax(
+            -1,
+            pmin(
+              1,
+              (vx1 * vx2 + vy1 * vy2) /
+                (len1 * len2)
+            )
+          )
+        ) * 180 / pi,
+
+      # distance remaining from start after full trajectory
+      Dist_12_18 =
+        sqrt(
+          (x18 - x12)^2 +
+          (y18 - y12)^2
+        ),
+
+      # how much return occurred
+      Return_Index =
+        Dist_12_18 / len1
+    ) %>%
+    ungroup() %>%
+    mutate(
+      Dataset = dataset_name,
+      PC1_Variance = var_exp[1],
+      PC2_Variance = var_exp[2],
+      PC1_PC2_Total = var_exp[1] + var_exp[2]
+    ) %>%
+    select(
+      Dataset,
+      origin,
+      PC1_Variance,
+      PC2_Variance,
+      PC1_PC2_Total,
+      Angle_Degrees,
+      Dist_12_18,
+      Return_Index
+    )
+
+  return(geom)
+}
+
+# ============================================================
+# RUN FOR ALL GENE SETS
+# ============================================================
+
+trajectory_summary <- bind_rows(
+
+  summarise_pca_trajectory(
+    whole_transcriptome_results,
+    "Whole transcriptome"
+  ),
+
+  summarise_pca_trajectory(
+    tier1_results,
+    "Tier 1"
+  ),
+
+  summarise_pca_trajectory(
+    tier2_results,
+    "Tier 2"
+  ),
+
+  summarise_pca_trajectory(
+    interaction_results,
+    "Interaction genes"
+  ),
+
+  summarise_pca_trajectory(
+    tier2b_results,
+    "Tier 2b"
+  ),
+
+  summarise_pca_trajectory(
+    tier3_results,
+    "Tier 3 Misexpressed"
+  ),
+
+  summarise_pca_trajectory(
+    tier1_tier3_results,
+    "Tier1 ∩ Tier3 Misexpressed"
+  )
+
+)
+
+knitr::kable(
+  trajectory_summary,
+  digits = 3,
+  caption = "PCA trajectory geometry and variance summary"
+)
+```
+
+## Gene expression trajectories
+
+PCA trajectory analyses revealed broad differences in transcriptomic responses among gene sets, but PCA summarizes average patterns and cannot determine whether genes within a given set follow similar or distinct expression trajectories. To identify major classes of transcriptional responses, we performed unsupervised hierarchical clustering of gene-level expression profiles.
+
+For each gene, mean VST expression was calculated for all origin-by-temperature combinations (W12, W15, W18, H12, H15, H18, S12, S15, and S18). Expression profiles were standardized on a per-gene basis to emphasize trajectory shape rather than absolute expression level. Genes were then clustered using hierarchical clustering with Ward's linkage and Euclidean distance. Cluster numbers were evaluated using silhouette analysis and supplemented by visual inspection of cluster size and biological interpretability.
+
+This analysis was performed separately for each focal gene set to determine whether different gene sets were characterized by distinct underlying response architectures.
+
+### Helper functions for unsupervised clustering
+```{r}
+# ------------------------------------------------------------
+# Build standardized trajectory matrix
+# ------------------------------------------------------------
+
+build_profile_matrix <- function(
+    gene_set,
+    expr_matrix,
+    metadata
+) {
+
+  genes_present <- intersect(
+    gene_set,
+    rownames(expr_matrix)
+  )
+
+  profile_matrix <- lapply(
+
+    genes_present,
+
+    function(gene) {
+
+      df <- data.frame(
+        sample = colnames(expr_matrix),
+        expression = as.numeric(expr_matrix[gene, ])
+      ) %>%
+        left_join(
+          metadata,
+          by = "sample"
+        ) %>%
+        group_by(
+          origin,
+          temperature
+        ) %>%
+        summarise(
+          Mean = mean(expression),
+          .groups = "drop"
+        )
+
+      data.frame(
+        Gene = gene,
+
+        W12 = df$Mean[df$origin == "W" & df$temperature == 12],
+        W15 = df$Mean[df$origin == "W" & df$temperature == 15],
+        W18 = df$Mean[df$origin == "W" & df$temperature == 18],
+
+        H12 = df$Mean[df$origin == "H" & df$temperature == 12],
+        H15 = df$Mean[df$origin == "H" & df$temperature == 15],
+        H18 = df$Mean[df$origin == "H" & df$temperature == 18],
+
+        S12 = df$Mean[df$origin == "S" & df$temperature == 12],
+        S15 = df$Mean[df$origin == "S" & df$temperature == 15],
+        S18 = df$Mean[df$origin == "S" & df$temperature == 18]
+      )
+
+    }
+
+  ) %>%
+    bind_rows()
+
+  profile_scaled <- profile_matrix %>%
+    column_to_rownames("Gene") %>%
+    as.matrix()
+
+  # Standardize each gene to emphasize profile shape
+  profile_scaled <- t(
+    scale(
+      t(profile_scaled)
+    )
+  )
+
+  return(profile_scaled)
+
+}
+
+
+# ------------------------------------------------------------
+# Evaluate candidate cluster numbers
+# ------------------------------------------------------------
+
+evaluate_k <- function(
+    profile_scaled,
+    k_range = 2:12
+) {
+
+  hc <- hclust(
+    dist(profile_scaled),
+    method = "ward.D2"
+  )
+
+  bind_rows(
+
+    lapply(
+
+      k_range,
+
+      function(k) {
+
+        clusters <- cutree(
+          hc,
+          k = k
+        )
+
+        data.frame(
+          k = k,
+
+          Mean_Silhouette = mean(
+            silhouette(
+              clusters,
+              dist(profile_scaled)
+            )[, 3]
+          ),
+
+          N_Clusters = length(
+            unique(clusters)
+          ),
+
+          Largest_Cluster = max(
+            table(clusters)
+          ),
+
+          Smallest_Cluster = min(
+            table(clusters)
+          )
+        )
+
+      }
+
+    )
+
+  )
+
+}
+
+
+# ------------------------------------------------------------
+# Run final clustering analysis
+# ------------------------------------------------------------
+
+
+run_clustering <- function(
+    gene_set,
+    expr_matrix,
+    metadata,
+    k
+) {
+
+  profile_scaled <- build_profile_matrix(
+    gene_set,
+    expr_matrix,
+    metadata
+  )
+
+  hc <- hclust(
+    dist(profile_scaled),
+    method = "ward.D2"
+  )
+
+  clusters <- cutree(
+    hc,
+    k = k
+  )
+
+  cluster_sizes <- data.frame(
+    Cluster = names(
+      table(clusters)
+    ),
+    N_Genes = as.vector(
+      table(clusters)
+    )
+  )
+
+  cluster_profiles <- data.frame(
+    profile_scaled,
+    Cluster = factor(clusters)
+  ) %>%
+    rownames_to_column("Gene") %>%
+    pivot_longer(
+      cols = -c(Gene, Cluster),
+      names_to = "Condition",
+      values_to = "Expression"
+    ) %>%
+    mutate(
+      Origin = substr(
+        Condition,
+        1,
+        1
+      ),
+      Temp = factor(
+        substr(
+          Condition,
+          2,
+          3
+        ),
+        levels = c(
+          "12",
+          "15",
+          "18"
+        )
+      )
+    ) %>%
+    group_by(
+      Cluster,
+      Origin,
+      Temp
+    ) %>%
+    summarise(
+      Mean = mean(Expression),
+      .groups = "drop"
+    )
+
+  profile_table <- data.frame(
+    profile_scaled,
+    Cluster = factor(clusters)
+  ) %>%
+    group_by(Cluster) %>%
+    summarise(
+      across(
+        where(is.numeric),
+        mean
+      ),
+      .groups = "drop"
+    )
+
+  p <- ggplot(
+    cluster_profiles,
+    aes(
+      x = Temp,
+      y = Mean,
+      colour = Origin,
+      group = Origin
+    )
+  ) +
+    geom_line(linewidth = 1.2) +
+    geom_point(size = 2) +
+    scale_colour_manual(
+      values = origin_colors
+    ) +
+    facet_wrap(
+      ~ Cluster,
+      scales = "free_y"
+    ) +
+    labs(
+      x = "Temperature (°C)",
+      y = "Scaled expression",
+      title = "Mean expression profiles recovered by unsupervised clustering"
+    ) +
+    theme_minimal(
+      base_size = 14
+    )
+
+  return(
+    list(
+      profile_scaled = profile_scaled,
+      hclust = hc,
+      clusters = clusters,
+      cluster_sizes = cluster_sizes,
+      cluster_profiles = cluster_profiles,
+      profile_table = profile_table,
+      plot = p
+    )
+  )
+
+}
+
+
+
+# ============================================================
+# Compare multiple clustering solutions
+# ============================================================
+
+explore_clusters <- function(
+    gene_set,
+    expr_matrix,
+    metadata,
+    k_values = 2:5
+){
+
+  results <- list()
+
+  for(k in k_values){
+
+    cat("\n")
+    cat("========================================\n")
+    cat("k =", k, "\n")
+    cat("========================================\n")
+
+    res <- run_clustering(
+      gene_set = gene_set,
+      expr_matrix = expr_matrix,
+      metadata = metadata,
+      k = k
+    )
+
+    print(res$plot)
+
+    print(
+      knitr::kable(
+        res$cluster_sizes,
+        caption = paste(
+          "Cluster sizes for k =",
+          k
+        )
+      )
+    )
+
+    print(
+      knitr::kable(
+        res$profile_table,
+        digits = 2,
+        caption = paste(
+          "Cluster profiles for k =",
+          k
+        )
+      )
+    )
+
+    results[[paste0("k_", k)]] <- res
+  }
+
+  return(results)
+
+}
+```
+
+### Tier 1
+```{r}
+tier1_k <- evaluate_k(
+  build_profile_matrix(
+    tier1_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  tier1_k,
+  digits = 3
+)
+
+tier1_explore <- explore_clusters(
+  gene_set = tier1_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2,3,4,5)
+)
+```
+
+Hierarchical clustering of Tier 1 genes identified k = 2 as the statistically optimal solution based on silhouette width (0.658). However, the k = 4 solution recovered four biologically distinct trajectory classes while retaining reasonably large cluster sizes. In addition to progressive increases, progressive decreases, and transient valley responses identified at lower k values, the k = 4 solution recovered a distinct transient peak trajectory that was not resolved at k = 3. Increasing clustering to k = 5 primarily subdivided an existing trajectory class into smaller groups without identifying a novel response pattern. We therefore retained k = 4 as the most biologically informative clustering solution.
+
+Cluster 1 (241 genes) 
+
+West: progressive increase
+Hybrid: progressive increase (reduced magnitude)
+South: weak transient peak 
+
+Cluster 2 (227 genes) 
+
+West: progressive decrease
+Hybrid: progressive decrease (weaker magnitude)
+South: response attenuation at 18°C
+
+Cluster 3 (97 genes)
+
+West: transient valley
+Hybrid: transient valley (weakest magnitude)
+South: transient valley  (strongest magnitude)
+
+Cluster 4 (28 genes)
+
+West: transient peak
+Hybrid: transient peak (weakest magnitude)
+South: transient peak (strongest magnitude)
+
+Tier 1 conserved temperature-responsive genes were resolved into four major transcriptional response classes. The two largest clusters differentiated Southern fish from Western and Hybrid fish, with Southern fish exhibiting more pronounced non-linear responses, whereas hybrid trajectories generally resembled those of Western fish but with reduced response magnitudes. The two smaller clusters recovered shared transient peak and transient valley responses across all origins, with response magnitudes consistently strongest in Southern fish and weakest in hybrids.
+
+### Tier 2
+```{r}
+tier2_k <- evaluate_k(
+  build_profile_matrix(
+    tier2_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  tier2_k,
+  digits = 3
+)
+
+tier2_explore <- explore_clusters(
+  gene_set = tier2_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2,3,4,5)
+)
+```
+
+Hierarchical clustering of Tier 2 genes identified k = 2 (831 and 667 genes) as the statistically optimal solution based on silhouette width (0.522). Higher-order clustering solutions resulted in progressively lower silhouette widths, indicating weaker clustering structure within this large and heterogeneous set of population-divergence genes. We therefore retained k = 2 as the most parsimonious and statistically supported clustering solution.
+
+
+Cluster 1 (831 genes)
+
+West: transient valley
+Hybrid: transient valley (weakest magnitude)
+South: transient valley with reduced expression relative to West and Hybrid
+
+
+Cluster 2 (667 genes)
+
+West: progressive decrease
+Hybrid: progressive decrease (reduced magnitude)
+South: weak transient valley with elevated expression relative to West and Hybrid
+
+Tier 2 population-divergence genes were resolved into two broad trajectory classes. The largest cluster recovered a shared transient valley response across all origins, with Southern fish exhibiting lower expression and hybrids showing the weakest response magnitude. In contrast, the second cluster differentiated Southern fish from Western and Hybrid fish through trajectory shape, with Southern fish exhibiting a weak transient valley response and higher expression levels, whereas Western and Hybrid fish displayed progressive decreases, with hybrids again showing reduced response magnitudes. In both clusters, hybrid expression profiles were generally intermediate between the parental populations, whereas Southern fish exhibited either reduced or elevated expression relative to Western and Hybrid fish across the temperature gradient. These results indicate that population divergence can arise through both differences in expression level despite similar response trajectories and differences in the trajectory of the transcriptional response itself.
+
+### Interaction genes
+```{r}
+interaction_k <- evaluate_k(
+  build_profile_matrix(
+    interaction_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  interaction_k,
+  digits = 3
+)
+
+interaction_explore <- explore_clusters(
+  gene_set = interaction_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2,3,4)
+)
+```
+Silhouette widths remained high for both k = 2 (0.589) and k = 3 (0.526), indicating reasonable clustering structure. The k = 3 solution recovered an additional biologically interpretable trajectory relative to k = 2 while retaining strong clustering support. In contrast, clustering solutions beyond k = 3 resulted in a substantial decline in silhouette width, indicating limited support for further subdivision. We therefore retained k = 3 as the most biologically informative clustering solution.
+
+Cluster 1 (102 genes)
+
+West: transient valley
+Hybrid: progressive increase
+South: progressive decrease
+
+
+Cluster 2 (716 genes)
+
+West: progressive decrease
+Hybrid: progressive decrease (reduced magnitude)
+South: transient valley
+
+
+Cluster 3 (159 genes)
+
+West: progressive increase
+Hybrid: progressive increase (reduced magnitude)
+South: transient peak
+
+The majority of interaction genes (Clusters 2 and 3; 875 genes) exhibited similar trajectories in Western and Hybrid fish, with hybrids generally showing reduced response magnitudes relative to Western fish. In contrast, Southern fish displayed non-linear transcriptional responses characterized by pronounced shifts at 15°C followed by partial recovery at 18°C. This pattern is consistent with the recovery signal observed in the PCA, where Southern fish exhibited the largest transcriptional shift between 12°C and 15°C but a substantially smaller separation between 12°C and 18°C.
+
+Cluster 1 (102 genes) exhibited a distinct response pattern in which Western, Hybrid, and Southern fish followed different expression trajectories. Notably, hybrids displayed a progressive increase with temperature, whereas Southern fish showed a progressive decrease and Western fish exhibited a transient valley response. This cluster therefore represents a subset of genes with expression patterns that diverge from both parental response trajectories and may reflect novel regulatory responses in hybrids.
+
+### Tier 2b
+#### Evaluate clustering support across k values
+```{r}
+# Evaluate clustering solutions
+tier2b_k <- evaluate_k(
+  build_profile_matrix(
+    tier2b_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  tier2b_k,
+  digits = 3
+)
+
+# Explore clustering solutions
+tier2b_explore <- explore_clusters(
+  gene_set = tier2b_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2, 3, 4, 5, 6)
+)
+```
+
+#### Cluster membership (k = 5)
+```{r}
+# Extract gene IDs assigned to each cluster for k = 5
+tier2b_cluster_membership_k5 <- tibble(
+  gene_id = names(tier2b_explore$k_5$clusters),
+  cluster = tier2b_explore$k_5$clusters
+)
+
+# Display genes grouped by cluster
+tier2b_cluster_membership_k5 %>%
+  arrange(cluster) %>%
+  group_by(cluster) %>%
+  summarise(
+    N_Genes = n(),
+    Genes = paste(gene_id, collapse = ", "),
+    .groups = "drop"
+  ) %>%
+  knitr::kable(
+    caption = "Tier 2b gene membership by cluster (k = 5)"
+  )
+
+```
+
+#### Cluster annotations (k = 5)
+```{r}
+# Merge cluster assignments with annotations
+tier2b_cluster_annotations <- tier2b_cluster_membership_k5 %>%
+  left_join(
+    annotations %>%
+      select(
+        gene_id,
+        egg_desc,
+        annotation_class,
+        genome_gene_id,
+        genome_coverage,
+        has_eggnog,
+        has_pfam_ipr,
+        has_genome_uniprot
+      ),
+    by = "gene_id"
+  ) %>%
+  arrange(
+    cluster,
+    gene_id
+  )
+
+# Display annotated genes by cluster
+tier2b_cluster_annotations %>%
+  select(
+    cluster,
+    gene_id,
+    egg_desc,
+    annotation_class,
+    genome_gene_id,
+    genome_coverage
+  ) %>%
+  knitr::kable(
+    caption = "Tier 2b annotated genes by cluster (k = 5)"
+  )
+```
+
+Silhouette width was highest for k = 2 (0.663) and declined with increasing cluster number. However, the k = 5 solution retained similar clustering support to k = 4 (0.465 vs. 0.461) while recovering two additional biologically interpretable singleton trajectories corresponding to the well annotated genes Sterile alpha motif domain-containing protein 9-like and Transmembrane 6 superfamily member 1. In contrast, clustering solutions beyond k = 5 resulted in a marked reduction in silhouette width (0.289 for k = 6), indicating limited support for further subdivision. We therefore retained k = 5 as the most biologically informative clustering solution.
+
+Cluster 1 (30 genes)
+
+West: progressive decrease
+Hybrid: progressive decrease (reduced magnitude)
+South: transient valley followed by recovery
+ 
+Cluster 2 (7 genes)
+
+West: transient valley
+Hybrid: transient valley (reduced magnitude)
+South: progressive decrease
+
+Cluster 3 (1 gene; SAMD9L)
+
+West: transient peak
+Hybrid: progressive decrease (low magnitude, near-stable expression)
+South: progressive decrease (strong magnitude from elevated 12°C expression)
+
+Cluster 4 (6 genes)
+
+West: progressive decrease
+Hybrid: progressive decrease (reduced magnitude)
+South: transient valley
+
+Cluster 5 (1 gene; TM6SF1)
+
+West: transient peak (low magnitude)
+Hybrid: transient valley (low magnitude)
+South:  transient peak (pronounced peak at 15°C)
+ 
+These results indicate that Tier 2b genes are dominated by a common response trajectory (Cluster 1; 30 genes), characterized by reduced expression between 12°C and 15°C in all populations followed by divergent responses at 18°C. Within this dominant cluster, South fish recovered expression at the warmest treatment, whereas West fish and hybrids remained downregulated.
+Clusters 2 and 4 also exhibited their greatest expression differences among origins at 18°C, indicating that most Tier 2b genes show their strongest population-specific expression differences under the warmest treatment. In both clusters, West and Hybrid fish followed similar trajectories, with hybrids generally displaying reduced response magnitudes relative to West fish, whereas South fish exhibited distinct expression patterns. In contrast, the singleton trajectories represented by SAMD9L and TM6SF1 displayed their greatest expression differences among origins at 12°C and 15°C, respectively, rather than at 18°C. Thus, while most Tier 2b candidate genes exhibited population-specific responses that became most pronounced at the warmest temperature, SAMD9L and TM6SF1 captured unique response trajectories operating at lower temperatures, suggesting that population-specific thermal responses can occur across multiple points of the thermal gradient rather than exclusively under the warmest treatment.
+Notably, SAMD9L lacked a corresponding genome-based annotation despite strong support from transcriptome-based annotations, indicating that transcriptome-guided annotation can recover biologically relevant genes that may be absent from genome-based annotations.
+
+### Tier 3 Misexpressed Genes
+```{r}
+tier3_k <- evaluate_k(
+  build_profile_matrix(
+    tier3_mis_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  tier3_k,
+  digits = 3
+)
+
+tier3_explore <- explore_clusters(
+  gene_set = tier3_mis_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2,3,4)
+)
+```
+
+Tier 3 Misexpressed genes exhibited substantially weaker clustering structure than the other gene sets, with a maximum silhouette width of 0.332 for k = 2. This suggests that hybrid misexpression is distributed across a diverse range of transcriptional response patterns rather than being dominated by a small number of discrete trajectory classes. Because k = 2 provided the strongest clustering support, we retained this solution for subsequent interpretation.
+
+Cluster 1 (387 genes)
+
+West: progressive increase
+Hybrid: progressive increase 
+South: transient peak
+
+Cluster 2 (340 genes)
+
+West: progressive decrease
+Hybrid: progressive decrease (reduced magnitude)
+South: transient valley
+
+The two clusters were of comparable size and represent broad opposing transcriptional response patterns. Cluster 1 was characterized by increasing expression with temperature in West and Hybrid fish together with a transient peak response in South fish, whereas Cluster 2 exhibited decreasing expression in West and Hybrid fish and a transient valley response in South fish. However, the relatively low silhouette widths and the absence of additional well-supported trajectory classes indicate that misexpressed genes do not form a small number of discrete expression programs. Instead, hybrid misexpression appears to be distributed across diverse transcriptional response patterns, consistent with the heterogeneous nature of regulatory incompatibilities.
+
+### Tier 1 ∩ Tier 3 Misexpressed Genes
+#### Evaluation of clustering solutions
+```{r}
+# Evaluate clustering solutions
+tier1_tier3_k <- evaluate_k(
+  build_profile_matrix(
+    tier1_tier3_mis_genes,
+    expr_matrix,
+    metadata
+  )
+)
+
+knitr::kable(
+  tier1_tier3_k,
+  digits = 3
+)
+
+# Explore clustering solutions
+tier1_tier3_explore <- explore_clusters(
+  gene_set = tier1_tier3_mis_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  k_values = c(2, 3, 4, 5)
+)
+```
+####Cluster membership (k = 4)
+```{r}
+# Extract gene IDs assigned to each cluster for k = 4
+tier1_tier3_cluster_membership_k4 <- tibble(
+  gene_id = names(tier1_tier3_explore$k_4$clusters),
+  cluster = tier1_tier3_explore$k_4$clusters
+)
+
+# Display genes grouped by cluster
+tier1_tier3_cluster_membership_k4 %>%
+  arrange(cluster) %>%
+  group_by(cluster) %>%
+  summarise(
+    N_Genes = n(),
+    Genes = paste(gene_id, collapse = ", "),
+    .groups = "drop"
+  ) %>%
+  knitr::kable(
+    caption = "Tier 1 ∩ Tier 3 gene membership by cluster (k = 4)"
+  )
+```
+#### Cluster annotations (k = 4)
+```{r}
+# Merge cluster assignments with annotations
+tier1_tier3_cluster_annotations <- tier1_tier3_cluster_membership_k4 %>%
+  left_join(
+    annotations %>%
+      select(
+        gene_id,
+        egg_desc,
+        annotation_class,
+        genome_gene_id,
+        genome_coverage,
+        has_eggnog,
+        has_pfam_ipr,
+        has_genome_uniprot
+      ),
+    by = "gene_id"
+  ) %>%
+  arrange(
+    cluster,
+    gene_id
+  )
+
+# Display annotated genes by cluster
+tier1_tier3_cluster_annotations %>%
+  select(
+    cluster,
+    gene_id,
+    egg_desc,
+    annotation_class,
+    genome_gene_id,
+    genome_coverage
+  ) %>%
+  knitr::kable(
+    caption = "Tier 1 ∩ Tier 3 annotated genes by cluster (k = 4)"
+  )
+```
+
+
+Silhouette width was highest for k = 2 (0.627) and declined gradually with increasing cluster number. However, the k = 4 solution retained relatively strong clustering support (0.549) while resolving four distinct multi-origin expression patterns. Compared with the k = 3 solution, k = 4 separated a broad cluster containing increasing-expression genes into two distinct response profiles, one characterized by transient peak responses across all origins and another characterized by progressive increases in West and Hybrid fish together with a transient peak response in South fish. Beyond k = 4, silhouette width declined more sharply from 0.549 to 0.490 and continued to decrease with increasing cluster number, indicating diminishing support for additional subdivision. We therefore retained k = 4 as the most biologically informative clustering solution.
+
+Cluster 1 (8 genes)
+
+West: progressive decrease (strongest magnitude)
+Hybrid: progressive decrease (intermediate magnitude)
+South: weak progressive decrease (lowest magnitude)
+
+Cluster 2 (3 genes)
+
+West: transient peak 
+Hybrid: transient peak (lowest magnitude)
+South: transient peak (strongest magnitude)
+
+Cluster 3 (5 genes)
+
+West: transient valley
+Hybrid: transient valley (weakest magnitude)
+South: transient valley (strongest magnitude)
+
+Cluster 4 (7 genes)
+
+West: progressive increase
+Hybrid: progressive increase (lower magnitude)
+South: transient peak
+
+These results indicate that misexpressed Tier 1 genes are distributed across multiple transcriptional response patterns. Notably, the k = 4 solution recovered the same major response architectures observed in the broader Tier 1 gene set, despite representing only 23 genes. Functional annotations were diverse across all four clusters and did not reveal obvious cluster-specific functional categories. This suggests that hybrid misexpression is not restricted to a particular subset of conserved temperature-responsive genes, but instead affects genes spanning several distinct temperature-response programs and biological functions.
+
+### Summary
+
+Hierarchical clustering revealed that different gene sets were characterized by distinct transcriptional response architectures. Tier 1 genes recovered multiple temperature-response patterns, but a consistent feature across clusters was that Southern fish exhibited stronger non-linear responses than Western and Hybrid fish, whereas hybrid trajectories generally resembled those of Western fish with reduced response magnitudes. In contrast, Tier 2 genes were dominated by two broad expression programs, demonstrating that transcriptional differences among populations can arise through both differences in expression level despite similar response trajectories and differences in the trajectory of the transcriptional response itself.
+
+Interaction genes and Tier 2b local adaptation candidates exhibited the strongest evidence for origin-specific thermal responses. In both gene sets, Western and Hybrid fish frequently followed similar trajectories, whereas Southern fish showed distinct and often more pronounced non-linear responses. Tier 2b candidates were particularly notable because most genes exhibited their strongest population-specific expression differences under the warmest treatment, consistent with the strong increase in parental divergence observed at 18°C. Nevertheless, the singleton trajectories represented by SAMD9L and TM6SF1 demonstrated that unique population-specific responses can also occur at lower temperatures.
+
+In contrast, Tier 3 misexpressed genes exhibited comparatively weak clustering structure despite comprising hundreds of genes. Misexpressed genes were distributed across multiple response architectures, and the Tier 1 ∩ Tier 3 overlap recovered the same major trajectory patterns observed in the broader Tier 1 gene set. Together with the limited overlap of misexpressed genes across temperatures observed in the Tier 3 analysis, these results indicate that hybrid misexpression is distributed across diverse genes and transcriptional response patterns rather than concentrated within a distinct regulatory program.
+
+
+## Individual gene trajectories 
+
+### Plotting helper function
+```{r}
+# ------------------------------------------------------------
+# Faceted gene trajectory plot with SD
+# ------------------------------------------------------------
+
+plot_gene_panel <- function(
+    gene_ids,
+    expr_matrix,
+    metadata,
+    title_text
+){
+
+  plot_df <- lapply(
+
+    gene_ids,
+
+    function(gene){
+
+      data.frame(
+        sample = colnames(expr_matrix),
+        Expression = as.numeric(expr_matrix[gene, ])
+      ) %>%
+        left_join(
+          metadata,
+          by = "sample"
+        ) %>%
+        group_by(
+          origin,
+          temperature
+        ) %>%
+        summarise(
+          Mean_Expression = mean(Expression),
+          SD = sd(Expression),
+          N = n(),
+          .groups = "drop"
+        ) %>%
+        mutate(
+          Gene = gene
+        )
+
+    }
+
+  ) %>%
+    bind_rows()
+
+  p <- ggplot(
+    plot_df,
+    aes(
+      x = temperature,
+      y = Mean_Expression,
+      colour = origin,
+      group = origin
+    )
+  ) +
+    geom_line(linewidth = 0.8) +
+    geom_point(size = 1.8) +
+    geom_errorbar(
+      aes(
+        ymin = Mean_Expression - SD,
+        ymax = Mean_Expression + SD
+      ),
+      width = 0.1,
+      linewidth = 0.3
+    ) +
+    scale_colour_manual(
+      values = origin_colors
+    ) +
+    facet_wrap(
+      ~ Gene,
+      scales = "free_y"
+    ) +
+    labs(
+      title = title_text,
+      x = "Temperature (°C)",
+      y = "Mean VST expression"
+    ) +
+    theme_minimal(base_size = 12)
+
+  return(p)
+
+}
+```
+
+### Tier 2b
+```{r}
+# ============================================================
+# TIER 2b (k = 5)
+# ============================================================
+
+tier2b_cluster_membership_k5 <- tibble(
+  gene_id = names(tier2b_explore$k_5$clusters),
+  cluster = tier2b_explore$k_5$clusters
+)
+
+# ------------------------------------------------------------
+# Cluster membership
+# ------------------------------------------------------------
+
+tier2b_cluster_membership_k5 %>%
+  arrange(cluster) %>%
+  group_by(cluster) %>%
+  summarise(
+    N_Genes = n(),
+    Genes = paste(gene_id, collapse = ", "),
+    .groups = "drop"
+  ) %>%
+  knitr::kable(
+    caption = "Tier 2b gene membership by cluster (k = 5)"
+  )
+
+# ------------------------------------------------------------
+# Cluster profiles
+# ------------------------------------------------------------
+
+tier2b_explore$k_5$profile_table %>%
+  knitr::kable(
+    digits = 2,
+    caption = "Cluster profiles for k = 5"
+  )
+
+# ------------------------------------------------------------
+# Individual gene trajectories by cluster
+# ------------------------------------------------------------
+
+tier2b_gene_plots <- list()
+
+for(cl in sort(unique(tier2b_cluster_membership_k5$cluster))) {
+
+  cluster_genes <- tier2b_cluster_membership_k5 %>%
+    filter(cluster == cl) %>%
+    pull(gene_id)
+
+  cat("\n\n")
+  cat("### Cluster", cl, "\n\n")
+
+  cluster_plot <- plot_gene_panel(
+    gene_ids = cluster_genes,
+    expr_matrix = expr_matrix,
+    metadata = metadata,
+    title_text = paste(
+      "Tier 2b Cluster",
+      cl,
+      "individual gene trajectories"
+    )
+  )
+
+  tier2b_gene_plots[[paste0("cluster_", cl)]] <- cluster_plot
+
+  print(cluster_plot)
+
+}
+```
+Individual gene trajectories were highly consistent within clusters and closely followed the expression patterns identified.
+
+### TIER 1 ∩ TIER 3 missexpressed
+```{r}
+# ============================================================
+# TIER 1 ∩ TIER 3 (k = 4)
+# ============================================================
+
+tier1_tier3_cluster_membership_k4 <- tibble(
+  gene_id = names(tier1_tier3_explore$k_4$clusters),
+  cluster = tier1_tier3_explore$k_4$clusters
+)
+
+# ------------------------------------------------------------
+# Cluster membership
+# ------------------------------------------------------------
+
+tier1_tier3_cluster_membership_k4 %>%
+  arrange(cluster) %>%
+  group_by(cluster) %>%
+  summarise(
+    N_Genes = n(),
+    Genes = paste(gene_id, collapse = ", "),
+    .groups = "drop"
+  ) %>%
+  knitr::kable(
+    caption = "Tier 1 ∩ Tier 3 gene membership by cluster (k = 4)"
+  )
+
+# ------------------------------------------------------------
+# Cluster profiles
+# ------------------------------------------------------------
+
+tier1_tier3_explore$k_4$profile_table %>%
+  knitr::kable(
+    digits = 2,
+    caption = "Cluster profiles for k = 4"
+  )
+
+# ------------------------------------------------------------
+# Individual gene trajectories by cluster
+# ------------------------------------------------------------
+
+tier1_tier3_gene_plots <- list()
+
+for(cl in sort(unique(tier1_tier3_cluster_membership_k4$cluster))) {
+
+  cluster_genes <- tier1_tier3_cluster_membership_k4 %>%
+    filter(cluster == cl) %>%
+    pull(gene_id)
+
+  cat("\n\n")
+  cat("### Cluster", cl, "\n\n")
+
+  cluster_plot <- plot_gene_panel(
+    gene_ids = cluster_genes,
+    expr_matrix = expr_matrix,
+    metadata = metadata,
+    title_text = paste(
+      "Tier 1 ∩ Tier 3 Cluster",
+      cl,
+      "individual gene trajectories"
+    )
+  )
+
+  tier1_tier3_gene_plots[[paste0("cluster_", cl)]] <- cluster_plot
+
+  print(cluster_plot)
+
+}
+```
+Individual gene trajectories closely matched the expression patterns identified by hierarchical clustering, indicating that the four-cluster solution reflected coherent gene-level responses.
+
+### TIER 2b ∩ TIER 3 missexpressed
+
+```{r}
+# ============================================================
+# TIER 2b ∩ TIER 3 MISEXPRESSED
+# ============================================================
+
+trajectory_values <- lapply(
+  tier2b_tier3_mis_genes,
+  function(gene){
+
+    df <- data.frame(
+      sample = colnames(expr_matrix),
+      expression = as.numeric(expr_matrix[gene, ])
+    ) %>%
+      left_join(metadata, by = "sample") %>%
+      group_by(origin, temperature) %>%
+      summarise(
+        Mean = mean(expression),
+        .groups = "drop"
+      )
+
+    tibble(
+      Gene_ID = gene,
+      W12 = df$Mean[df$origin == "W" & df$temperature == 12],
+      W15 = df$Mean[df$origin == "W" & df$temperature == 15],
+      W18 = df$Mean[df$origin == "W" & df$temperature == 18],
+      H12 = df$Mean[df$origin == "H" & df$temperature == 12],
+      H15 = df$Mean[df$origin == "H" & df$temperature == 15],
+      H18 = df$Mean[df$origin == "H" & df$temperature == 18],
+      S12 = df$Mean[df$origin == "S" & df$temperature == 12],
+      S15 = df$Mean[df$origin == "S" & df$temperature == 15],
+      S18 = df$Mean[df$origin == "S" & df$temperature == 18]
+    )
+
+  }
+) %>%
+  bind_rows()
+
+knitr::kable(
+  trajectory_values,
+  digits = 2,
+  caption = "Trajectory values for the Tier 2b ∩ Tier 3 misexpressed gene"
+)
+
+tier2b_tier3_gene_plot <- plot_gene_panel(
+  gene_ids = tier2b_tier3_mis_genes,
+  expr_matrix = expr_matrix,
+  metadata = metadata,
+  title_text = "Tier 2b ∩ Tier 3 misexpressed gene trajectory"
+)
+
+print(tier2b_tier3_gene_plot)
+
+```
+The overlap between Tier 2b and Tier 3 misexpressed genes consisted of a single CD81-like gene that exhibited within-range misexpression only at 18°C, indicating that hybrid expression remained intermediate between the parental expression levels despite being significantly differentiated from both parental populations. While the overall number of misexpressed genes showed little variation across temperatures and substantial trajectory heterogeneity overall, this finding raises the possibility that hybridization may disrupt expression of particular local thermal adaptation candidates under warmer conditions.
+
+
+## South-West expression divergence across temperatures
+
+Differential expression analyses identified multiple gene sets that differed in their responses to temperature and population origin. However, differential expression alone does not quantify the magnitude of expression divergence between parental populations. To evaluate how strongly Southern and Western populations differed transcriptionally within each gene set, we quantified South-West expression divergence across temperatures.
+For each gene, mean expression was calculated separately for each parental origin (Southern and Western) at each temperature treatment. Gene-level parental divergence was then defined as the absolute difference in mean expression between origins (|S − W|). This metric captures the magnitude of population differentiation irrespective of the direction of expression change.
+To compare patterns among gene sets, gene-level divergence values were summarized within each temperature and gene set. Mean parental divergence was estimated from the resulting gene-level distributions, and uncertainty around these estimates was quantified using non-parametric bootstrap resampling of genes within each gene set (100,000 bootstrap replicates). The 2.5th and 97.5th percentiles of the bootstrap distributions were used to construct 95% confidence intervals around mean divergence estimates.
+Divergence trajectories and their associated bootstrap confidence intervals were then visualized across temperatures to compare patterns of parental expression divergence among gene sets.
+
+
+#### South-West expression divergence across temperatures
+
+```{r divergence}
+
+# ============================================================
+# CALCULATE GENE-LEVEL MEAN EXPRESSION
+# ============================================================
+
+genes_for_divergence <- unique(c(
+  tier1_genes,
+  tier2_genes,
+  interaction_genes,
+  tier2b_genes,
+  tier3_mis_genes,
+  tier1_tier3_mis_genes
+))
+
+genes_for_divergence <- intersect(
+  genes_for_divergence,
+  rownames(expr_matrix)
+)
+
+gene_means <- lapply(
+  genes_for_divergence,
+  function(gene) {
+
+    data.frame(
+      gene = gene,
+      sample = colnames(expr_matrix),
+      expression = as.numeric(expr_matrix[gene, ])
+    ) %>%
+      left_join(
+        metadata,
+        by = "sample"
+      ) %>%
+      group_by(
+        gene,
+        origin,
+        temperature
+      ) %>%
+      summarise(
+        mean_expression = mean(expression),
+        .groups = "drop"
+      )
+
+  }
+) %>%
+  bind_rows()
+
+# ============================================================
+# BUILD GENE-LEVEL DIVERGENCE DATA
+# ============================================================
+
+# Calculate South-West divergence for each gene
+divergence_by_gene <- gene_means %>%
+  filter(origin %in% c("S", "W")) %>%
+  pivot_wider(
+    names_from = origin,
+    values_from = mean_expression
+  ) %>%
+  mutate(
+    parental_divergence = abs(S - W)
+  )
+
+# Combine focal gene sets into a single table
+plot_data <- bind_rows(
+
+  divergence_by_gene %>%
+    filter(gene %in% tier1_genes) %>%
+    mutate(Gene_Set = "Tier 1"),
+
+  divergence_by_gene %>%
+    filter(gene %in% tier2_genes) %>%
+    mutate(Gene_Set = "Tier 2"),
+
+  divergence_by_gene %>%
+    filter(gene %in% interaction_genes) %>%
+    mutate(Gene_Set = "Interaction genes"),
+
+  divergence_by_gene %>%
+    filter(gene %in% tier2b_genes) %>%
+    mutate(Gene_Set = "Tier 2b"),
+
+  divergence_by_gene %>%
+    filter(gene %in% tier3_mis_genes) %>%
+    mutate(Gene_Set = "Tier 3 Misexpressed"),
+
+  divergence_by_gene %>%
+    filter(gene %in% tier1_tier3_mis_genes) %>%
+    mutate(Gene_Set = "Tier1 ∩ Tier3 Misexpressed")
+)
+
+# ============================================================
+# BOOTSTRAP CONFIDENCE INTERVALS
+# ============================================================
+
+set.seed(123)
+
+n_boot <- 100000
+
+bootstrap_results <- plot_data %>%
+  group_by(
+    Gene_Set,
+    temperature
+  ) %>%
+  group_modify(~{
+
+    x <- .x$parental_divergence
+
+    boot_means <- replicate(
+      n_boot,
+      mean(
+        sample(
+          x,
+          size = length(x),
+          replace = TRUE
+        )
+      )
+    )
+
+    tibble(
+      Mean_Divergence = mean(x),
+      CI_Lower = quantile(boot_means, 0.025),
+      CI_Upper = quantile(boot_means, 0.975),
+      N_Genes = length(x),
+      SD_Divergence = sd(x)
+    )
+
+  }) %>%
+  ungroup()
+
+knitr::kable(
+  bootstrap_results,
+  digits = 3,
+  caption = "Bootstrap confidence intervals for South-West divergence"
+)
+
+# ============================================================
+# PLOT MAJOR GENE SETS ONLY
+# ============================================================
+
+plot_bootstrap <- bootstrap_results %>%
+  filter(
+    Gene_Set != "Tier1 ∩ Tier3 Misexpressed"
+  )
+
+ggplot(
+  plot_bootstrap,
+  aes(
+    x = factor(temperature),
+    y = Mean_Divergence,
+    colour = Gene_Set,
+    group = Gene_Set
+  )
+) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(
+      ymin = CI_Lower,
+      ymax = CI_Upper
+    ),
+    width = 0.15,
+    linewidth = 0.5
+  ) +
+  labs(
+    x = "Temperature (°C)",
+    y = "Mean |S − W| divergence",
+    title = "South-West expression divergence across temperatures"
+  ) +
+  theme_bw(base_size = 14)
+
+```
+
+#### Divergence patterns across temperatures
+
+- **12°C:** Tier 2 ≈ Tier 2b > Tier 3 Misexpressed ≈ Interaction genes ≈ Tier1 ∩ Tier3 Misexpressed > Tier 1
+
+- **15°C:** Tier 2 ≈ Interaction genes > Tier 1 ≈ Tier 3 Misexpressed, whereas Tier 2b and Tier1 ∩ Tier3 Misexpressed overlap all major gene sets due to their wider confidence intervals.
+
+- **18°C:** Tier 2b > Interaction genes > Tier 1 ≈ Tier1 ∩ Tier3 Misexpressed ≈ Tier 2 > Tier 3 Misexpressed
+
+#### Observations
+
+- At 12°C, Tier 2 genes showed the greatest parental divergence (0.378, 95% CI = 0.370–0.387), consistent with their definition as population-divergence genes, followed by Tier 2b genes (0.311, 95% CI = 0.245–0.404). The overlap in bootstrap confidence intervals is consistent with Tier 2b being a small subset of the broader Tier 2 gene set and suggests that local adaptation candidates retain the elevated parental expression divergence characteristic of Tier 2 genes.
+
+- At 15°C, divergence values converged across gene sets. This convergence was driven by a reduction in parental divergence among Tier 2 and Tier 2b genes relative to 12°C, together with increased divergence among Tier 1, interaction genes, Tier 3 Misexpressed genes, and the Tier1 ∩ Tier3 Misexpressed overlap set. As a result, mean divergence values fell within a relatively narrow range (0.236-0.285).
+
+- Despite this overall convergence at 15°C, Tier 2 genes (0.285, 95% CI = 0.273-0.297) and interaction genes (0.283, 95% CI = 0.267-0.299) exhibited higher divergence than Tier 1 genes (0.240, 95% CI = 0.221-0.260) and Tier 3 Misexpressed genes (0.236, 95% CI = 0.218-0.256). In contrast, the Tier 2b and Tier1 ∩ Tier3 Misexpressed overlap sets exhibited broad confidence intervals that overlapped all gene sets, reflecting the relatively small number of genes in these categories.
+
+- At 18°C, divergence increased in every gene set, indicating that elevated temperature generally amplified transcriptional differences between Southern and Western populations. The magnitude of this increase differed markedly among gene sets. Tier 2b genes exhibited the highest divergence at 18°C (1.340, 95% CI = 1.188–1.494), followed by interaction genes (0.959, 95% CI = 0.927–0.991). Tier 1 (0.693, 95% CI = 0.648–0.739) and Tier 2 (0.661, 95% CI = 0.642–0.681) exhibited similar levels of divergence, whereas Tier 3 Misexpressed genes showed substantially lower divergence (0.430, 95% CI = 0.401–0.460). 
+
+- Tier 2b genes showed the largest temperature-dependent increase in divergence, rising from 0.311 at 12°C to 1.340 at 18°C. Tier 2b genes displayed substantial parental expression divergence at 12°C, consistent with their derivation from the Tier 2 population-divergence gene set. Their divergence might therefore be expected to resemble either the broader Tier 2 or interaction gene sets. Instead, Tier 2b genes exceeded both groups at 18°C, becoming the most highly differentiated gene set. This pattern supports the biological relevance of the Tier 2b classification and suggests that the combination of population divergence and temperature-dependent regulatory divergence identifies a particularly differentiated subset of genes.
+
+- Interaction genes also showed a strong divergence increase at 18°C, suggesting that many of the significant origin-by-temperature interactions detected by DESeq2 are driven by transcriptional differences that become most apparent under the warmest treatment.
+
+- Tier 1 genes exhibited the lowest parental divergence at 12°C (0.159, 95% CI = 0.149–0.170), consistent with their definition as conserved temperature-responsive genes. However, divergence increased substantially with temperature, reaching 0.693 (95% CI = 0.648–0.739) at 18°C and exceeding that observed in the broader Tier 3 Misexpressed gene set (0.430, 95% CI = 0.401–0.460). This pattern suggests that conserved transcriptional responses to temperature can become increasingly differentiated between parental populations under warmer conditions.
+
+- Interestingly, the Tier1 ∩ Tier3 Misexpressed overlap set occupied an intermediate position between Tier 1 and Tier 3 Misexpressed genes at 12°C, consistent with its origin as an intersection of the two categories. At 18°C, its mean divergence (0.672) was considerably closer to that of Tier 1 genes (0.693) than the broader Tier 3 Misexpressed gene set (0.430), although confidence intervals remained wide owing to the small size of the overlap set (not displayed in the figure owing to its wide confidence intervals).
+
+
+#### Biological interpretations
+
+Together, these results support the biological relevance of the Tier 2b extraction strategy. Tier 2b genes displayed substantial parental expression divergence at 12°C, consistent with their derivation from the Tier 2 population-divergence gene set, but also exhibited the strongest divergence increase at 18°C, where they became the most highly differentiated gene set. Tier 2b genes exceeded interaction genes in parental divergence at 18°C, indicating that the combination of population divergence and origin-specific thermal responses identifies a particularly differentiated subset of genes.
+
+Despite exhibiting the highest levels of parental divergence, only a single Tier 2b gene (CD81-like) was misexpressed in hybrids. In contrast, the broader set of Tier 3 misexpressed genes remained comparatively weakly diverged. These findings indicate that hybrid misexpression is not strongly associated with the magnitude of population divergence and suggest that most adaptive regulatory differences remain compatible in hybrids. Nevertheless, the temperature-dependent misexpression of the highly divergent Tier 2b gene CD81-like raises the possibility that elevated temperature can expose regulatory incompatibilities at specific adaptive loci.
+
+#### Caveat
+
+Because only two Southern individuals were available at 15°C and 18°C, estimates of parental divergence at these temperatures should be interpreted with some caution. However, the reduced divergence differences observed among gene sets at 15°C, together with the disproportionately large increase observed specifically for interaction genes and Tier 2b candidates at 18°C, suggests that the observed patterns are unlikely to be fully explained by sampling variation.
+
+## Summary
+
+PCA trajectory analyses revealed a distinct Southern transcriptional response to temperature, characterized by movement away from the 12°C transcriptomic state at 15°C followed by partial return toward the 12°C state at 18°C. This recovery pattern was observed across the whole transcriptome and all focal gene sets, indicating that it represents a pervasive feature of the Southern response to temperature. Hybrid trajectories generally resembled those of Western fish but exhibited reduced transcriptomic displacement across the temperature gradient. The magnitude of the Southern trajectory reversal varied among gene sets and closely reflected their biological definitions. Reversal was weakest among Tier 1 conserved temperature-responsive genes, suggesting that the Southern recovery pattern is less pronounced among genes contributing to the core thermal-response program shared across populations. In contrast, interaction genes and Tier 2b local adaptation candidates exhibited the strongest reversals, consistent with the Southern recovery response representing a distinct Southern strategy for responding to temperature. Tier 2 population-divergence genes exhibited reversal similar to that observed across the whole transcriptome, suggesting that the Southern recovery pattern alone is unlikely to account for the differential expression observed between parental populations. Both Tier 3 misexpressed genes and the Tier 1 ∩ Tier 3 overlap exhibited relatively strong reversal, supporting an association between the Southern recovery response and hybrid misexpression.
+
+Hierarchical clustering revealed that different gene sets were characterized by distinct transcriptional response architectures. Tier 1 genes recovered multiple temperature-response patterns, but a consistent feature across clusters was that Southern fish exhibited stronger non-linear responses than Western and Hybrid fish, whereas hybrid trajectories generally resembled those of Western fish with reduced response magnitudes. In contrast, Tier 2 genes were dominated by two broad expression programs, demonstrating that transcriptional differences among populations can arise through both differences in expression level despite similar response trajectories and differences in the trajectory of the transcriptional response itself.
+Interaction genes and Tier 2b local adaptation candidates exhibited the strongest evidence for origin-specific thermal responses. In both gene sets, Western and Hybrid fish frequently followed similar trajectories, whereas Southern fish showed distinct and often more pronounced non-linear responses. Tier 2b candidates were particularly notable because most genes exhibited their strongest population-specific expression differences under the warmest treatment, consistent with the strong increase in parental divergence observed at 18°C. Nevertheless, the singleton trajectories represented by SAMD9L and TM6SF1 demonstrated that unique population-specific thermal responses can also occur at lower temperatures.
+In contrast, Tier 3 misexpressed genes exhibited comparatively weak clustering structure despite comprising hundreds of genes. Misexpressed genes were distributed across multiple response architectures, and the Tier 1 ∩ Tier 3 overlap recovered the same major trajectory patterns observed in the broader Tier 1 gene set. Together with the limited overlap of misexpressed genes across temperatures observed in the Tier 3 analysis, these results indicate that hybrid misexpression is distributed across diverse genes and transcriptional response patterns rather than concentrated within a distinct regulatory program.
+
+Expression divergence analyses revealed substantial differences among gene sets in how transcriptional differentiation between Southern and Western populations changed across the thermal gradient. Although divergence values converged across gene sets at 15°C, divergence increased markedly at 18°C, indicating that elevated temperature generally amplified transcriptional differences between populations.
+Tier 2b genes already exhibited substantial expression divergence between Southern and Western populations at 12°C and showed the strongest divergence increase at 18°C, where they became the most highly differentiated gene set. Tier 2b genes exceeded both the broader Tier 2 and interaction gene sets in parental divergence at the warmest treatment, suggesting that the combination of population divergence and origin-specific thermal responses identifies a particularly differentiated subset of genes.
+Despite exhibiting the highest levels of parental divergence, only a single Tier 2b gene (CD81-like) was misexpressed in hybrids. In contrast, the broader set of Tier 3 misexpressed genes remained comparatively weakly diverged. Together, these findings suggest that hybrid misexpression is not strongly associated with the magnitude of parental expression divergence and that most population-specific regulatory differences remain compatible in hybrids. Nevertheless, the temperature-dependent misexpression of the highly divergent CD81-like gene raises the possibility that elevated temperature can expose regulatory incompatibilities at specific loci.
+
+## Session Info
+```{r session_info} 
+sessionInfo()
+```	
+
+
+```{r save_selected_figures, include=FALSE}
+
+# ============================================================
+# SAVE FINAL FIGURES
+# ============================================================
+
+dir.create(
+  "results/transcriptomic_trajectories/figures",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  "results/transcriptomic_trajectories/figures/individual_gene_panels",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+# ------------------------------------------------------------
+# PCA FIGURES
+# ------------------------------------------------------------
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_whole_transcriptome.png",
+  plot = whole_transcriptome_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_tier1.png",
+  plot = tier1_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_tier2.png",
+  plot = tier2_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_interaction_genes.png",
+  plot = interaction_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_tier2b.png",
+  plot = tier2b_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_tier3_misexpressed.png",
+  plot = tier3_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/pca_tier1_tier3_misexpressed.png",
+  plot = tier1_tier3_results$plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+# ------------------------------------------------------------
+# SELECTED CLUSTERING SOLUTIONS
+# ------------------------------------------------------------
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_tier1_k4.png",
+  plot = tier1_explore$k_4$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_tier2_k2.png",
+  plot = tier2_explore$k_2$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_interaction_k3.png",
+  plot = interaction_explore$k_3$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_tier2b_k5.png",
+  plot = tier2b_explore$k_5$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_tier3_k2.png",
+  plot = tier3_explore$k_2$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/clustering_tier1_tier3_k4.png",
+  plot = tier1_tier3_explore$k_4$plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+# ------------------------------------------------------------
+# SOUTH-WEST DIVERGENCE FIGURE
+# ------------------------------------------------------------
+
+divergence_plot <- ggplot(
+  plot_bootstrap,
+  aes(
+    x = factor(temperature),
+    y = Mean_Divergence,
+    colour = Gene_Set,
+    group = Gene_Set
+  )
+) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(
+      ymin = CI_Lower,
+      ymax = CI_Upper
+    ),
+    width = 0.15,
+    linewidth = 0.5
+  ) +
+  labs(
+    x = "Temperature (°C)",
+    y = "Mean |S − W| divergence",
+    title = "South-West expression divergence across temperatures"
+  ) +
+  theme_bw(base_size = 14)
+
+ggsave(
+  "results/transcriptomic_trajectories/figures/south_west_divergence.png",
+  plot = divergence_plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+# ------------------------------------------------------------
+# TIER 2b INDIVIDUAL GENE PANELS
+# ------------------------------------------------------------
+
+for(plot_name in names(tier2b_gene_plots)) {
+
+  ggsave(
+    filename = file.path(
+      "results/transcriptomic_trajectories/figures/individual_gene_panels",
+      paste0(
+        "tier2b_",
+        plot_name,
+        ".png"
+      )
+    ),
+    plot = tier2b_gene_plots[[plot_name]],
+    width = 12,
+    height = 8,
+    dpi = 300
+  )
+
+}
+
+# ------------------------------------------------------------
+# TIER 1 ∩ TIER 3 INDIVIDUAL GENE PANELS
+# ------------------------------------------------------------
+
+for(plot_name in names(tier1_tier3_gene_plots)) {
+
+  ggsave(
+    filename = file.path(
+      "results/transcriptomic_trajectories/figures/individual_gene_panels",
+      paste0(
+        "tier1_tier3_",
+        plot_name,
+        ".png"
+      )
+    ),
+    plot = tier1_tier3_gene_plots[[plot_name]],
+    width = 12,
+    height = 8,
+    dpi = 300
+  )
+
+}
+
+# ------------------------------------------------------------
+# TIER 2b ∩ TIER 3 MISEXPRESSED GENE
+# ------------------------------------------------------------
+
+ggsave(
+  filename = file.path(
+    "results/transcriptomic_trajectories/figures/individual_gene_panels",
+    "tier2b_tier3_misexpressed_gene.png"
+  ),
+  plot = tier2b_tier3_gene_plot,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+```
+
+

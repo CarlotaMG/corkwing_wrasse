@@ -1,0 +1,1728 @@
+---
+title: "Differential Expression Analysis of Corwing Wrasse"
+author: "Carlota Myhre de Gouveia"
+date: "2026-10-08"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(
+  root.dir   = here::here())
+```
+
+# Pairwise DESeq2 Analysis with Interaction Model
+
+This report summarizes pairwise differential expression analyses performed using a DESeq2 interaction model incorporating population origin, temperature treatment, and body length as a covariate. Pairwise contrasts were used to evaluate temperature responses within Western, Southern, and Hybrid fish and to assess transcriptional divergence among origins at each temperature.
+
+The objectives of this analysis were to:
+
+- compare patterns of differential expression in response to temperature within each origin; and
+- compare patterns of transcriptional divergence among origins across temperature treatments.
+
+
+## Package Loading
+```{r packages}
+
+suppressPackageStartupMessages({
+
+  library(tidyverse)
+  library(DESeq2)
+  library(apeglm)
+  library(ashr)
+  library(readxl)
+  library(VennDiagram)
+  library(grid)
+  library(here)
+  library(knitr)
+
+})
+  
+```
+
+## Data Import and Preprocessing
+```{r load_data}
+# Load gene abundance matrix
+abundance_matrix <- read.table(
+  "data/DE/abundance_matrix.txt",
+  header = TRUE,
+  row.names = 1,
+  check.names = FALSE
+)
+
+colnames(abundance_matrix) <- sub(
+  ".*Melops",
+  "",
+  colnames(abundance_matrix)
+)
+
+# Load sample metadata
+sample_info <- read_excel(
+  "data/sample_conditions_rnaseq.xlsx"
+) %>%
+  mutate(
+    
+    sample = sub("L", "", RNA_Later_ID),   # matches abundance matrix columns
+    
+    origin = factor(
+      Origin,
+      levels = c("W", "H", "S")
+    ),
+    
+    temperature = factor(
+      `Temperature (celsius)`,
+      levels = c(12, 15, 18)
+    ),
+    
+    condition = factor(
+      RNAseqgroup,
+      levels = c(
+        "W12", "W15", "W18",
+        "H12", "H15", "H18",
+        "S12", "S15", "S18"
+      )
+    ),
+    
+    length = scale(`Total length (mm)`)   # standardize body length covariate
+    
+  ) %>%
+  select(
+    sample,
+    origin,
+    temperature,
+    condition,
+    length
+  )
+
+# Reorder sample_info rows to match abundance_matrix columns
+sample_info <- sample_info %>%
+  arrange(
+    match(
+      sample,
+      colnames(abundance_matrix)
+    )
+  )
+
+# Round counts and ensure non-negative integers
+abundance_matrix <- round(
+  pmax(abundance_matrix, 0)
+)
+
+# Load candidate gene sets
+# Interaction-effect genes
+interaction_genes <- rownames(
+  read.csv(
+    "results/DE/interaction_effects/significant_interaction_genes.csv",
+    row.names = 1
+  )
+)
+# Tier 1 shared temperature-response genes
+tier1_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier1_shared_temperature_response/tier1_shared_temperature_genes.csv"
+  )$gene_id
+)
+# Tier 2 population-divergence genes
+tier2_genes <- rownames(
+  read.csv(
+    "results/DE/origin_contrast_additive_model/S_vs_W_significant_genes.csv",
+    row.names = 1
+  )
+)
+# Tier 2b local adaptation candidate genes
+tier2b_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier2_pop_divergence/tier2b_local_adaptation/tier2b_local_adaptation_candidates.csv"
+  )$gene_id
+)
+
+# Tier 3 misexpressed genes
+tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier3_hybrid_inheritance/tier3_misexpressed_genes.csv"
+  )$gene_id
+)
+
+# Tier 1 ∩ Tier 3 misexpressed genes
+tier1_tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier_intersections/tier1_tier3_misexpressed.csv"
+  )$gene_id
+)
+
+# Tier 2b ∩ Tier 3 misexpressed genes
+tier2b_tier3_mis_genes <- na.omit(
+  read.csv(
+    "results/functional_enrichment/tier_intersections/tier2b_tier3_misexpressed.csv"
+  )$gene_id
+)
+
+# Define color pallets
+origin_colors <- c(
+  "W" = "#8da0cb",  # lavender
+  "H" = "#66c2a5",  # turquoise
+  "S" = "#fc8d62"   # salmon
+)
+
+temperature_colors <- c(
+  "12°C" = "#4C78A8",  # muted blue
+  "15°C" = "#e6ab02",  # muted gold
+  "18°C" = "#E45756"   # muted red
+)
+
+temperature_contrast_colors <- c(
+  "15 vs 12" = "#80b1d3",
+  "18 vs 12" = "#fccde5",
+  "18 vs 15" = "#fdb462"
+)
+
+origin_contrast_colors <- c(
+  "S vs W" = "#9970ab",  # muted purple
+  "H vs W" = "#5ab4ac",  # muted teal
+  "S vs H" = "#F46D43" # coral
+)
+
+
+# Show preview of the abundance matrix
+knitr::kable(
+  abundance_matrix[1:10, 1:10],
+  caption = "Gene abundance matrix (first 10 genes × 10 samples)"
+)
+
+# Show metadata
+knitr::kable(
+  sample_info,
+  caption = "Sample metadata"
+)
+```
+
+## Prepare dataset and run DESeq2
+```{r dataset_DESeq2_run}
+# Create DESeq2 dataset with interaction model
+dds_interaction <- DESeqDataSetFromMatrix(
+  countData = abundance_matrix,
+  colData   = sample_info,
+  design    = ~ length + origin * temperature
+)
+
+# Filter out lowly expressed genes
+# Keep genes with total count ≥ 10 across all samples
+dds_interaction <- dds_interaction[
+  rowSums(counts(dds_interaction)) >= 10,
+]
+
+# Run DESeq2 pipeline
+dds_interaction <- DESeq(dds_interaction)
+
+# Extract coefficient names for downstream contrasts
+coef_names <- resultsNames(dds_interaction)
+
+# Plot dispersion estimates across genes
+plotDispEsts(dds_interaction)
+```
+The dispersion estimates closely follow the fitted trend, indicating that the negative binomial model adequately captures the relationship between gene abundance and variance. A small number of low-count outliers are expected and are accommodated by DESeq2 shrinkage procedures.
+
+## Helper Functions
+```{r helper_functions} 
+
+# Extract significant genes from a DESeq2 result
+get_sig_genes <- function(
+  res,
+  alpha = 0.05,
+  lfcThreshold = 0
+) {
+
+  sig <- res[
+    which(
+      !is.na(res$padj) &
+      res$padj < alpha &
+      abs(res$log2FoldChange) > lfcThreshold
+    ),
+  ]
+
+  rownames(sig)
+
+}
+
+# Count upregulated and downregulated genes
+count_de <- function(
+  res,
+  alpha = 0.05,
+  lfcThreshold = 0
+) {
+
+  sig <- res[
+    which(
+      !is.na(res$padj) &
+      res$padj < alpha &
+      abs(res$log2FoldChange) > lfcThreshold
+    ),
+  ]
+
+  list(
+    up = sum(sig$log2FoldChange > 0, na.rm = TRUE),
+    down = sum(sig$log2FoldChange < 0, na.rm = TRUE)
+  )
+
+}
+
+
+# Plot MA plot with significant gene counts
+plot_ma_with_counts <- function(
+  res,
+  title,
+  alpha = 0.05,
+  lfcThreshold = 0
+) {
+
+  sig <- res[
+    which(
+      !is.na(res$padj) &
+      res$padj < alpha &
+      abs(res$log2FoldChange) > lfcThreshold
+    ),
+  ]
+
+  up <- sum(sig$log2FoldChange > 0, na.rm = TRUE)
+  down <- sum(sig$log2FoldChange < 0, na.rm = TRUE)
+
+  DESeq2::plotMA(
+    res,
+    ylim = c(-10, 10),
+    alpha = alpha,
+    colSig = "red",
+    main = title
+  )
+
+  text(
+    x = max(res$baseMean, na.rm = TRUE) * 0.4,
+    y = 9,
+    labels = paste("↑:", up),
+    col = "blue",
+    cex = 0.9
+  )
+
+  text(
+    x = max(res$baseMean, na.rm = TRUE) * 0.4,
+    y = -9,
+    labels = paste("↓:", down),
+    col = "blue",
+    cex = 0.9
+  )
+
+}
+
+# Venn diagrams
+# Color palettes for Venn diagrams
+
+origin_colors <- c(
+  "W" = "#8da0cb",  # lavender
+  "H" = "#66c2a5",  # turquoise
+  "S" = "#fc8d62"   # salmon
+)
+
+temperature_colors <- c(
+  "12°C" = "#4C78A8",  # muted blue
+  "15°C" = "#e6ab02",  # muted gold
+  "18°C" = "#E45756"   # muted red
+)
+
+temperature_contrast_colors <- c(
+  "15 vs 12" = "#80b1d3",
+  "18 vs 12" = "#fccde5",
+  "18 vs 15" = "#fdb462"
+)
+
+origin_contrast_colors <- c(
+  "S vs W" = "#9970ab",  # muted purple
+  "H vs W" = "#5ab4ac",  # muted teal
+  "S vs H" = "#F46D43" # coral
+)
+
+
+
+# Create Venn diagrams
+
+plot_venn <- function(
+  gene_sets,
+  title_text,
+  fill_colors
+) {
+
+  venn_plot <- venn.diagram(
+    x = gene_sets,
+    category.names = names(gene_sets),
+    filename = NULL,
+    fill = fill_colors,
+    alpha = 0.6,
+    col = "grey50",
+    lwd = 1,
+    cex = 1.5,
+    cat.cex = 1.5
+  )
+
+  grid.newpage()
+  grid.draw(venn_plot)
+
+  grid.text(
+    title_text,
+    y = 0.99
+  )
+
+}
+
+# Summarize overlap among three gene sets for Venn diagram reporting
+get_venn_counts <- function(gene_sets) {
+
+  a <- gene_sets[[1]]
+  b <- gene_sets[[2]]
+  c <- gene_sets[[3]]
+
+  counts <- data.frame(
+
+    Region = c(
+      names(gene_sets)[1],
+      names(gene_sets)[2],
+      names(gene_sets)[3],
+      paste(names(gene_sets)[1], "&", names(gene_sets)[2]),
+      paste(names(gene_sets)[1], "&", names(gene_sets)[3]),
+      paste(names(gene_sets)[2], "&", names(gene_sets)[3]),
+      "All three"
+    ),
+
+    Genes = c(
+      length(setdiff(a, union(b, c))),
+      length(setdiff(b, union(a, c))),
+      length(setdiff(c, union(a, b))),
+      length(setdiff(intersect(a, b), c)),
+      length(setdiff(intersect(a, c), b)),
+      length(setdiff(intersect(b, c), a)),
+      length(Reduce(intersect, list(a, b, c)))
+    )
+  )
+
+  counts$Percent <- round(
+    100 * counts$Genes /
+      length(unique(c(a, b, c))),
+    1
+  )
+
+  counts
+}
+
+```
+
+## Temperature contrasts
+Pairwise temperature contrasts (15°C vs 12°C, 18°C vs 12°C, and 18°C vs 15°C) were performed separately within each origin using the interaction model. Differentially expressed genes were identified to compare thermal response patterns among Western, Southern, and Hybrid fish.
+### Define contrasts
+```{r temp_contrast_definition}
+# Western (direct coefficients -> apeglm)
+
+res_W15_vs_W12 <- lfcShrink(
+  dds_interaction,
+  coef = "temperature_15_vs_12",
+  type = "apeglm"
+)
+
+res_W18_vs_W12 <- lfcShrink(
+  dds_interaction,
+  coef = "temperature_18_vs_12",
+  type = "apeglm"
+)
+
+# derived contrast -> ashr
+
+res_W18_vs_W15 <- lfcShrink(
+  dds_interaction,
+  contrast = c(
+    "temperature",
+    "18",
+    "15"
+  ),
+  type = "ashr"
+)
+
+# Southern (derived contrasts -> ashr)
+
+res_S15_vs_S12 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_15_vs_12",
+      "originS.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+res_S18_vs_S12 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_18_vs_12",
+      "originS.temperature18"
+    )
+  ),
+  type = "ashr"
+)
+
+res_S18_vs_S15 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_18_vs_12",
+      "originS.temperature18"
+    ),
+    c(
+      "temperature_15_vs_12",
+      "originS.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+# Hybrid (derived contrasts -> ashr)
+
+res_H15_vs_H12 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_15_vs_12",
+      "originH.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+res_H18_vs_H12 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_18_vs_12",
+      "originH.temperature18"
+    )
+  ),
+  type = "ashr"
+)
+
+res_H18_vs_H15 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "temperature_18_vs_12",
+      "originH.temperature18"
+    ),
+    c(
+      "temperature_15_vs_12",
+      "originH.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+```
+
+### Significant genes
+```{r temp_contrast_sig_genes}
+W15 <- get_sig_genes(res_W15_vs_W12)
+W18 <- get_sig_genes(res_W18_vs_W12)
+W1815 <- get_sig_genes(res_W18_vs_W15)
+
+S15 <- get_sig_genes(res_S15_vs_S12)
+S18 <- get_sig_genes(res_S18_vs_S12)
+S1815 <- get_sig_genes(res_S18_vs_S15)
+
+H15 <- get_sig_genes(res_H15_vs_H12)
+H18 <- get_sig_genes(res_H18_vs_H12)
+H1815 <- get_sig_genes(res_H18_vs_H15)
+```
+
+### Differential Expression Summary
+```{r temp_contrast_sum_table}
+W15_counts <- count_de(res_W15_vs_W12)
+W18_counts <- count_de(res_W18_vs_W12)
+W1815_counts <- count_de(res_W18_vs_W15)
+
+S15_counts <- count_de(res_S15_vs_S12)
+S18_counts <- count_de(res_S18_vs_S12)
+S1815_counts <- count_de(res_S18_vs_S15)
+
+H15_counts <- count_de(res_H15_vs_H12)
+H18_counts <- count_de(res_H18_vs_H12)
+H1815_counts <- count_de(res_H18_vs_H15)
+
+summary_table <- data.frame(
+  Comparison = c(
+    "W15_vs_W12",
+    "W18_vs_W12",
+    "W18_vs_W15",
+    "S15_vs_S12",
+    "S18_vs_S12",
+    "S18_vs_S15",
+    "H15_vs_H12",
+    "H18_vs_H12",
+    "H18_vs_H15"
+  ),
+  Upregulated = c(
+    W15_counts$up,
+    W18_counts$up,
+    W1815_counts$up,
+    S15_counts$up,
+    S18_counts$up,
+    S1815_counts$up,
+    H15_counts$up,
+    H18_counts$up,
+    H1815_counts$up
+  ),
+  Downregulated = c(
+    W15_counts$down,
+    W18_counts$down,
+    W1815_counts$down,
+    S15_counts$down,
+    S18_counts$down,
+    S1815_counts$down,
+    H15_counts$down,
+    H18_counts$down,
+    H1815_counts$down
+  )
+)
+
+knitr::kable(summary_table)
+```
+
+### MA Plots
+```{r temp_contrast_MA_plots}
+plot_ma_with_counts(
+  res_W15_vs_W12,
+  "Western: 15 vs 12"
+)
+
+plot_ma_with_counts(
+  res_W18_vs_W12,
+  "Western: 18 vs 12"
+)
+
+plot_ma_with_counts(
+  res_W18_vs_W15,
+  "Western: 18 vs 15"
+)
+
+plot_ma_with_counts(
+  res_S15_vs_S12,
+  "Southern: 15 vs 12"
+)
+
+plot_ma_with_counts(
+  res_S18_vs_S12,
+  "Southern: 18 vs 12"
+)
+
+plot_ma_with_counts(
+  res_S18_vs_S15,
+  "Southern: 18 vs 15"
+)
+
+plot_ma_with_counts(
+  res_H15_vs_H12,
+  "Hybrid: 15 vs 12"
+)
+
+plot_ma_with_counts(
+  res_H18_vs_H12,
+  "Hybrid: 18 vs 12"
+)
+
+plot_ma_with_counts(
+  res_H18_vs_H15,
+  "Hybrid: 18 vs 15"
+)
+```
+
+### Venn Diagrams
+#### Shared Temperature Responses Across Origins
+```{r venn_temp_contarst_across_origin}
+# 15 vs 12 across origins
+
+plot_venn(
+  list(
+    Western  = W15,
+    Southern = S15,
+    Hybrid   = H15
+  ),
+  "15°C vs 12°C",
+  fill_colors = unname(origin_colors[c("W", "S", "H")])
+)
+
+# 18 vs 12 across origins
+
+plot_venn(
+  list(
+    Western  = W18,
+    Southern = S18,
+    Hybrid   = H18
+  ),
+  "18°C vs 12°C",
+  fill_colors = unname(origin_colors[c("W", "S", "H")])
+)
+
+# 18 vs 15 across origins
+
+plot_venn(
+  list(
+    Western  = W1815,
+    Southern = S1815,
+    Hybrid   = H1815
+  ),
+  "18°C vs 15°C",
+  fill_colors = unname(origin_colors[c("W", "S", "H")])
+)
+
+# Summary of overlap among origins within each temperature contrast
+
+temperature_origin_venn_summary <- bind_rows(
+
+  cbind(
+    Contrast = "15_vs_12",
+    get_venn_counts(
+      list(
+        Western = W15,
+        Southern = S15,
+        Hybrid = H15
+      )
+    )
+  ),
+
+  cbind(
+    Contrast = "18_vs_12",
+    get_venn_counts(
+      list(
+        Western = W18,
+        Southern = S18,
+        Hybrid = H18
+      )
+    )
+  ),
+
+  cbind(
+    Contrast = "18_vs_15",
+    get_venn_counts(
+      list(
+        Western = W1815,
+        Southern = S1815,
+        Hybrid = H1815
+      )
+    )
+  )
+
+)
+
+knitr::kable(
+  temperature_origin_venn_summary,
+  caption = "Overlap among origins within each temperature contrast"
+)
+```
+
+Western and Southern fish shared a substantially larger number of temperature-responsive genes than either parental population shared with hybrids during the 12°C to 15°C transition.
+
+#### Shared Temperature Responses Within Origins
+
+```{r venn_temp_contarst_within_origins}
+
+# Western temperature overlap
+
+plot_venn(
+  list(
+    "15 vs 12" = W15,
+    "18 vs 12" = W18,
+    "18 vs 15" = W1815
+  ),
+  "Western",
+  fill_colors = unname(temperature_contrast_colors)
+)
+
+# Southern temperature overlap
+
+plot_venn(
+  list(
+    "15 vs 12" = S15,
+    "18 vs 12" = S18,
+    "18 vs 15" = S1815
+  ),
+  "Southern",
+  fill_colors = unname(temperature_contrast_colors)
+)
+
+# Hybrid temperature overlap
+
+plot_venn(
+  list(
+    "15 vs 12" = H15,
+    "18 vs 12" = H18,
+    "18 vs 15" = H1815
+  ),
+  "Hybrid",
+  fill_colors = unname(temperature_contrast_colors)
+)
+
+# Summary of overlap among temperature contrasts within each origin
+
+temperature_venn_summary <- bind_rows(
+
+  cbind(
+    Origin = "West",
+    get_venn_counts(
+      list(
+        "15 vs 12" = W15,
+        "18 vs 12" = W18,
+        "18 vs 15" = W1815
+      )
+    )
+  ),
+
+  cbind(
+    Origin = "South",
+    get_venn_counts(
+      list(
+        "15 vs 12" = S15,
+        "18 vs 12" = S18,
+        "18 vs 15" = S1815
+      )
+    )
+  ),
+
+  cbind(
+    Origin = "Hybrid",
+    get_venn_counts(
+      list(
+        "15 vs 12" = H15,
+        "18 vs 12" = H18,
+        "18 vs 15" = H1815
+      )
+    )
+  )
+
+)
+
+knitr::kable(
+  temperature_venn_summary,
+  caption = "Overlap among temperature contrasts within each origin"
+)
+
+```
+
+
+
+### Overall Temperature-Responsive Gene Repertoires
+```{r overall_temp_gene_repertoir}
+
+###############################################################################
+# All temperature-responsive genes per origin
+###############################################################################
+
+West_all <- Reduce(
+  union,
+  list(W15, W18, W1815)
+)
+
+South_all <- Reduce(
+  union,
+  list(S15, S18, S1815)
+)
+
+Hybrid_all <- Reduce(
+  union,
+  list(H15, H18, H1815)
+)
+
+###############################################################################
+# Origin-specific temperature-responsive genes
+###############################################################################
+
+West_unique <- setdiff(
+  West_all,
+  union(South_all, Hybrid_all)
+)
+
+South_unique <- setdiff(
+  South_all,
+  union(West_all, Hybrid_all)
+)
+
+Hybrid_unique <- setdiff(
+  Hybrid_all,
+  union(West_all, South_all)
+)
+
+###############################################################################
+# Shared temperature-responsive genes
+###############################################################################
+
+West_South <- setdiff(
+  intersect(West_all, South_all),
+  Hybrid_all
+)
+
+West_Hybrid <- setdiff(
+  intersect(West_all, Hybrid_all),
+  South_all
+)
+
+South_Hybrid <- setdiff(
+  intersect(South_all, Hybrid_all),
+  West_all
+)
+
+All_three <- Reduce(
+  intersect,
+  list(
+    West_all,
+    South_all,
+    Hybrid_all
+  )
+)
+
+###############################################################################
+# Overall temperature-responsive gene repertoire overlap among origins
+###############################################################################
+
+overall_temp_venn <- list(
+  Western  = West_all,
+  Southern = South_all,
+  Hybrid   = Hybrid_all
+)
+
+plot_venn(
+  overall_temp_venn,
+  "All temperature-responsive genes",
+  fill_colors = unname(
+    origin_colors[c("W", "S", "H")]
+  )
+)
+
+###############################################################################
+# Summary table
+###############################################################################
+
+temperature_origin_union_summary <- data.frame(
+  Region = c(
+    "Western",
+    "Southern",
+    "Hybrid",
+    "Western & Southern",
+    "Western & Hybrid",
+    "Southern & Hybrid",
+    "All three"
+  ),
+  Genes = c(
+    length(West_unique),
+    length(South_unique),
+    length(Hybrid_unique),
+    length(West_South),
+    length(West_Hybrid),
+    length(South_Hybrid),
+    length(All_three)
+  )
+)
+
+temperature_origin_union_summary$Percent <- round(
+  100 * temperature_origin_union_summary$Genes /
+    sum(temperature_origin_union_summary$Genes),
+  1
+)
+
+knitr::kable(
+  temperature_origin_union_summary,
+  caption = "Overlap of temperature-responsive genes among origins (all temperature contrasts combined)"
+)
+
+###############################################################################
+# Totals per origin
+###############################################################################
+
+origin_temperature_summary <- data.frame(
+  Origin = c(
+    "Western",
+    "Southern",
+    "Hybrid"
+  ),
+  Total_Temperature_Responsive_Genes = c(
+    length(West_all),
+    length(South_all),
+    length(Hybrid_all)
+  ),
+  Unique_Genes = c(
+    length(West_unique),
+    length(South_unique),
+    length(Hybrid_unique)
+  )
+)
+
+knitr::kable(
+  origin_temperature_summary,
+  caption = "Total and origin-specific temperature-responsive genes"
+)
+```
+ 
+Western fish exhibited the largest overall repertoire of temperature-responsive genes (17,824 genes), followed by Hybrid (11,386 genes) and Southern fish (10,728 genes). Approximately 37.7% of temperature-responsive genes in Western fish were unique to that origin, compared with 21.8% and 21.3% in Hybrid and Southern fish, respectively.
+Despite substantial origin-specific responses, a core set of 5,479 genes was temperature-responsive in all three origins, indicating a strong conserved thermal response.
+
+### Calculate persistence of temperature-responsive genes across contrasts
+```{r}
+# Calculate persistence of temperature-responsive genes across contrasts
+
+response_persistence_summary <- data.frame(
+
+  Origin = c(
+    "West",
+    "South",
+    "Hybrid"
+  ),
+
+  `15→18 also in 12→15` = c(
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(W1815, W15)) / length(W1815),
+      length(intersect(W1815, W15)),
+      length(W1815)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(S1815, S15)) / length(S1815),
+      length(intersect(S1815, S15)),
+      length(S1815)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(H1815, H15)) / length(H1815),
+      length(intersect(H1815, H15)),
+      length(H1815)
+    )
+  ),
+
+  `12→15 also in 12→18` = c(
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(W15, W18)) / length(W15),
+      length(intersect(W15, W18)),
+      length(W15)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(S15, S18)) / length(S15),
+      length(intersect(S15, S18)),
+      length(S15)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(H15, H18)) / length(H15),
+      length(intersect(H15, H18)),
+      length(H15)
+    )
+  ),
+
+  `15→18 also in 12→18` = c(
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(W1815, W18)) / length(W1815),
+      length(intersect(W1815, W18)),
+      length(W1815)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(S1815, S18)) / length(S1815),
+      length(intersect(S1815, S18)),
+      length(S1815)
+    ),
+
+    sprintf(
+      "%.1f%% (%s/%s)",
+      100 * length(intersect(H1815, H18)) / length(H1815),
+      length(intersect(H1815, H18)),
+      length(H1815)
+    )
+  ),
+
+  check.names = FALSE
+)
+
+knitr::kable(
+  response_persistence_summary,
+  caption = "Persistence of temperature-responsive genes across temperature contrasts within each origin"
+)
+
+```
+
+Western fish exhibited extensive overlap among contrasts involving 18°C. Approximately 65.3% of genes differentially expressed between 12°C and 15°C were also differentially expressed between 12°C and 18°C, while 62.4% of genes differentially expressed between 15°C and 18°C were also identified in the 12°C vs 18°C comparison. Together with the large number of genes differentially expressed at 18°C vs 12°C (13,208 genes), these patterns suggest increasing divergence toward a distinct 18°C transcriptional state.
+
+Southern fish displayed a markedly different pattern. Although 10,076 genes were differentially expressed between 12°C and 15°C, only 2,353 genes were differentially expressed between 12°C and 18°C. Furthermore, 91.3% of genes differentially expressed between 15°C and 18°C were also identified in the 12°C vs 15°C comparison, whereas only 17.2% of genes from the 12°C vs 15°C comparison were retained in the 12°C vs 18°C contrast. These results indicate that a major transcriptional shift occurred between 12°C and 15°C but was not maintained at 18°C, resulting in a strong but largely transient response centered on 15°C.
+
+Hybrid fish exhibited a third pattern. Although 6,035 genes were differentially expressed between 12°C and 15°C, 73.8% of these genes were also differentially expressed between 12°C and 18°C, while only 346 genes differed between 18°C and 15°C. These results suggest that a major transcriptional response was initiated between 12°C and 15°C and largely maintained at 18°C, with comparatively few additional changes occurring between 15°C and 18°C.
+
+## Origin Contrasts
+
+###  Define Origin Contrasts
+```{r define_origin_contrast}
+# Southern vs Western
+
+res_S_vs_W_12 <- lfcShrink(
+  dds_interaction,
+  coef = "origin_S_vs_W",
+  type = "apeglm"
+)
+
+res_S_vs_W_15 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_S_vs_W",
+      "originS.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+res_S_vs_W_18 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_S_vs_W",
+      "originS.temperature18"
+    )
+  ),
+  type = "ashr"
+)
+
+# Hybrid vs Western
+
+res_H_vs_W_12 <- lfcShrink(
+  dds_interaction,
+  coef = "origin_H_vs_W",
+  type = "apeglm"
+)
+
+res_H_vs_W_15 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_H_vs_W",
+      "originH.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+res_H_vs_W_18 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_H_vs_W",
+      "originH.temperature18"
+    )
+  ),
+  type = "ashr"
+)
+
+# Southern vs Hybrid
+
+res_S_vs_H_12 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    "origin_S_vs_W",
+    "origin_H_vs_W"
+  ),
+  type = "ashr"
+)
+
+res_S_vs_H_15 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_S_vs_W",
+      "originS.temperature15"
+    ),
+    c(
+      "origin_H_vs_W",
+      "originH.temperature15"
+    )
+  ),
+  type = "ashr"
+)
+
+res_S_vs_H_18 <- lfcShrink(
+  dds_interaction,
+  contrast = list(
+    c(
+      "origin_S_vs_W",
+      "originS.temperature18"
+    ),
+    c(
+      "origin_H_vs_W",
+      "originH.temperature18"
+    )
+  ),
+  type = "ashr"
+)
+
+
+```
+
+### Significant Genes
+```{r origin_contrast_sig_genes}
+SW12 <- get_sig_genes(res_S_vs_W_12)
+SW15 <- get_sig_genes(res_S_vs_W_15)
+SW18 <- get_sig_genes(res_S_vs_W_18)
+
+HW12 <- get_sig_genes(res_H_vs_W_12)
+HW15 <- get_sig_genes(res_H_vs_W_15)
+HW18 <- get_sig_genes(res_H_vs_W_18)
+
+SH12 <- get_sig_genes(res_S_vs_H_12)
+SH15 <- get_sig_genes(res_S_vs_H_15)
+SH18 <- get_sig_genes(res_S_vs_H_18)
+```
+
+
+### Summary table
+```{r origin_contrast_summary}
+HW12_counts <- count_de(res_H_vs_W_12)
+SW12_counts <- count_de(res_S_vs_W_12)
+SH12_counts <- count_de(res_S_vs_H_12)
+
+HW15_counts <- count_de(res_H_vs_W_15)
+SW15_counts <- count_de(res_S_vs_W_15)
+SH15_counts <- count_de(res_S_vs_H_15)
+
+HW18_counts <- count_de(res_H_vs_W_18)
+SW18_counts <- count_de(res_S_vs_W_18)
+SH18_counts <- count_de(res_S_vs_H_18)
+
+origin_summary <- data.frame(
+  Comparison = c(
+    "H_vs_W_12",
+    "S_vs_W_12",
+    "S_vs_H_12",
+    "H_vs_W_15",
+    "S_vs_W_15",
+    "S_vs_H_15",
+    "H_vs_W_18",
+    "S_vs_W_18",
+    "S_vs_H_18"
+  ),
+  Upregulated = c(
+    HW12_counts$up,
+    SW12_counts$up,
+    SH12_counts$up,
+    HW15_counts$up,
+    SW15_counts$up,
+    SH15_counts$up,
+    HW18_counts$up,
+    SW18_counts$up,
+    SH18_counts$up
+  ),
+  Downregulated = c(
+    HW12_counts$down,
+    SW12_counts$down,
+    SH12_counts$down,
+    HW15_counts$down,
+    SW15_counts$down,
+    SH15_counts$down,
+    HW18_counts$down,
+    SW18_counts$down,
+    SH18_counts$down
+  )
+)
+
+knitr::kable(
+  origin_summary,
+  caption = "Differentially expressed genes in origin contrasts"
+)
+```
+
+
+Population divergence was highly temperature dependent. At 12°C and 15°C, relatively few genes differed among origins, whereas divergence increased dramatically at 18°C. The strongest divergence occurred between Southern and Western fish (4,669 genes), followed by Southern and Hybrid fish (1,817 genes). In contrast, Western and Hybrid fish remained relatively similar across all temperatures, differing by only 143 to 242 genes.
+These results indicate that transcriptional divergence among the two populations emerges primarily under elevated temperature.
+
+### MA plots
+```{r origin_contrast_MA_plots}
+plot_ma_with_counts(
+  res_S_vs_W_12,
+  "Southern vs Western (12°C)"
+)
+
+plot_ma_with_counts(
+  res_S_vs_W_15,
+  "Southern vs Western (15°C)"
+)
+
+plot_ma_with_counts(
+  res_S_vs_W_18,
+  "Southern vs Western (18°C)"
+)
+
+plot_ma_with_counts(
+  res_H_vs_W_12,
+  "Hybrid vs Western (12°C)"
+)
+
+plot_ma_with_counts(
+  res_H_vs_W_15,
+  "Hybrid vs Western (15°C)"
+)
+
+plot_ma_with_counts(
+  res_H_vs_W_18,
+  "Hybrid vs Western (18°C)"
+)
+
+plot_ma_with_counts(
+  res_S_vs_H_12,
+  "Southern vs Hybrid (12°C)"
+)
+
+plot_ma_with_counts(
+  res_S_vs_H_15,
+  "Southern vs Hybrid (15°C)"
+)
+
+plot_ma_with_counts(
+  res_S_vs_H_18,
+  "Southern vs Hybrid (18°C)"
+)
+```
+
+### Venn Diagrams
+#### Shared Population Divergence Across Temperatures
+```{r venn_temp_within_origin}
+
+# Venn diagrams of overlap among temperatures within each origin contrast
+
+plot_venn(
+  list(
+    "12°C" = SW12,
+    "15°C" = SW15,
+    "18°C" = SW18
+  ),
+  "Southern vs Western",
+  fill_colors = unname(temperature_colors)
+)
+
+plot_venn(
+  list(
+    "12°C" = HW12,
+    "15°C" = HW15,
+    "18°C" = HW18
+  ),
+  "Hybrid vs Western",
+  fill_colors = unname(temperature_colors)
+)
+
+plot_venn(
+  list(
+    "12°C" = SH12,
+    "15°C" = SH15,
+    "18°C" = SH18
+  ),
+  "Southern vs Hybrid",
+  fill_colors = unname(temperature_colors)
+)
+
+# Summary of overlap among temperatures within each origin contrast
+
+origin_venn_summary <- bind_rows(
+
+  cbind(
+    Contrast = "South_vs_West",
+    get_venn_counts(
+      list(
+        "12°C" = SW12,
+        "15°C" = SW15,
+        "18°C" = SW18
+      )
+    )
+  ),
+
+  cbind(
+    Contrast = "Hybrid_vs_West",
+    get_venn_counts(
+      list(
+        "12°C" = HW12,
+        "15°C" = HW15,
+        "18°C" = HW18
+      )
+    )
+  ),
+
+  cbind(
+    Contrast = "South_vs_Hybrid",
+    get_venn_counts(
+      list(
+        "12°C" = SH12,
+        "15°C" = SH15,
+        "18°C" = SH18
+      )
+    )
+  )
+
+)
+
+knitr::kable(
+  origin_venn_summary,
+  caption = "Overlap among temperatures within each origin contrast"
+)
+```
+
+Population divergence was highly temperature dependent. Relatively few genes differed among origins at 12°C and 15°C, whereas divergence increased dramatically at 18°C. The strongest divergence occurred between Southern and Western fish (4,669 genes), followed by Southern and Hybrid fish (1,817 genes). In contrast, Western and Hybrid fish remained comparatively similar across all temperatures.
+
+#### Shared Population Divergence Within Temperatures
+
+```{r}
+
+# Venn diagrams of overlap among origin contrasts within each temperature
+
+# 12°C origin contrasts
+
+plot_venn(
+  list(
+    "S vs W" = SW12,
+    "H vs W" = HW12,
+    "S vs H" = SH12
+  ),
+  "12°C",
+  fill_colors = unname(origin_contrast_colors)
+)
+
+# 15°C origin contrasts
+
+plot_venn(
+  list(
+    "S vs W" = SW15,
+    "H vs W" = HW15,
+    "S vs H" = SH15
+  ),
+  "15°C",
+  fill_colors = unname(origin_contrast_colors)
+)
+
+# 18°C origin contrasts
+
+plot_venn(
+  list(
+    "S vs W" = SW18,
+    "H vs W" = HW18,
+    "S vs H" = SH18
+  ),
+  "18°C",
+  fill_colors = unname(origin_contrast_colors)
+)
+
+# Summary of overlap among origin contrasts within each temperature
+
+origin_temperature_venn_summary <- bind_rows(
+
+  cbind(
+    Temperature = "12°C",
+    get_venn_counts(
+      list(
+        "S vs W" = SW12,
+        "H vs W" = HW12,
+        "S vs H" = SH12
+      )
+    )
+  ),
+
+  cbind(
+    Temperature = "15°C",
+    get_venn_counts(
+      list(
+        "S vs W" = SW15,
+        "H vs W" = HW15,
+        "S vs H" = SH15
+      )
+    )
+  ),
+
+  cbind(
+    Temperature = "18°C",
+    get_venn_counts(
+      list(
+        "S vs W" = SW18,
+        "H vs W" = HW18,
+        "S vs H" = SH18
+      )
+    )
+  )
+
+)
+
+knitr::kable(
+  origin_temperature_venn_summary,
+  caption = "Overlap among origin contrasts within each temperature treatment"
+)
+
+```
+
+
+The pattern of overlap further highlights the distinct behaviour of Southern fish at 18°C. A total of 1,603 genes were shared between the Southern versus Hybrid and Southern versus Western comparisons at 18°C. Consequently, 88.3% of genes diverging between Southern and Hybrid fish at 18°C were also divergent between Southern and Western fish.
+Together, these results indicate that population divergence at elevated temperature is driven primarily by the emergence of a distinct Southern transcriptional profile, whereas Western and Hybrid fish remain comparatively similar.
+
+## Distribution of Candidate Gene Sets Across Pairwise Contrasts
+Candidate gene sets identified in previous analyses were mapped onto pairwise contrasts to determine where conserved temperature responses, population divergence, interaction effects, and local thermal adaptation candidates were most strongly represented.
+### Temperature contrast
+```{r distribution_tiers_across_temp}
+# Distribution of candidate gene sets across temperature contrasts
+
+temperature_overlap <- data.frame(
+
+  Contrast = c(
+    "W15_vs_W12",
+    "W18_vs_W12",
+    "W18_vs_W15",
+    "S15_vs_S12",
+    "S18_vs_S12",
+    "S18_vs_S15",
+    "H15_vs_H12",
+    "H18_vs_H12",
+    "H18_vs_H15"
+  ),
+
+  DE_Genes = c(
+    length(W15),
+    length(W18),
+    length(W1815),
+    length(S15),
+    length(S18),
+    length(S1815),
+    length(H15),
+    length(H18),
+    length(H1815)
+  ),
+
+  Tier1 = c(
+    length(intersect(W15, tier1_genes)),
+    length(intersect(W18, tier1_genes)),
+    length(intersect(W1815, tier1_genes)),
+    length(intersect(S15, tier1_genes)),
+    length(intersect(S18, tier1_genes)),
+    length(intersect(S1815, tier1_genes)),
+    length(intersect(H15, tier1_genes)),
+    length(intersect(H18, tier1_genes)),
+    length(intersect(H1815, tier1_genes))
+  ),
+
+  Interaction = c(
+    length(intersect(W15, interaction_genes)),
+    length(intersect(W18, interaction_genes)),
+    length(intersect(W1815, interaction_genes)),
+    length(intersect(S15, interaction_genes)),
+    length(intersect(S18, interaction_genes)),
+    length(intersect(S1815, interaction_genes)),
+    length(intersect(H15, interaction_genes)),
+    length(intersect(H18, interaction_genes)),
+    length(intersect(H1815, interaction_genes))
+  ),
+
+  Tier2 = c(
+    length(intersect(W15, tier2_genes)),
+    length(intersect(W18, tier2_genes)),
+    length(intersect(W1815, tier2_genes)),
+    length(intersect(S15, tier2_genes)),
+    length(intersect(S18, tier2_genes)),
+    length(intersect(S1815, tier2_genes)),
+    length(intersect(H15, tier2_genes)),
+    length(intersect(H18, tier2_genes)),
+    length(intersect(H1815, tier2_genes))
+  ),
+
+  Tier2b = c(
+    length(intersect(W15, tier2b_genes)),
+    length(intersect(W18, tier2b_genes)),
+    length(intersect(W1815, tier2b_genes)),
+    length(intersect(S15, tier2b_genes)),
+    length(intersect(S18, tier2b_genes)),
+    length(intersect(S1815, tier2b_genes)),
+    length(intersect(H15, tier2b_genes)),
+    length(intersect(H18, tier2b_genes)),
+    length(intersect(H1815, tier2b_genes))
+  )
+
+)
+
+temperature_overlap <- temperature_overlap |>
+  mutate(
+
+    Tier1_Percent =
+      round(
+        100 * Tier1 / length(tier1_genes),
+        1
+      ),
+
+    Interaction_Percent =
+      round(
+        100 * Interaction / length(interaction_genes),
+        1
+      ),
+
+    Tier2_Percent =
+      round(
+        100 * Tier2 / length(tier2_genes),
+        1
+      ),
+
+    Tier2b_Percent =
+      round(
+        100 * Tier2b / length(tier2b_genes),
+        1
+      )
+
+  )
+
+knitr::kable(
+  temperature_overlap,
+  digits = 1,
+  caption = "Association of temperature contrasts with candidate gene sets"
+)
+```
+
+### Origin contrast
+```{r distribution_tiers_across_origin}
+# Distribution of candidate gene sets across origin contrasts
+
+origin_overlap <- data.frame(
+
+  Contrast = c(
+    "H_vs_W_12",
+    "S_vs_W_12",
+    "S_vs_H_12",
+    "H_vs_W_15",
+    "S_vs_W_15",
+    "S_vs_H_15",
+    "H_vs_W_18",
+    "S_vs_W_18",
+    "S_vs_H_18"
+  ),
+
+  DE_Genes = c(
+    length(HW12),
+    length(SW12),
+    length(SH12),
+    length(HW15),
+    length(SW15),
+    length(SH15),
+    length(HW18),
+    length(SW18),
+    length(SH18)
+  ),
+
+  Tier1 = c(
+    length(intersect(HW12, tier1_genes)),
+    length(intersect(SW12, tier1_genes)),
+    length(intersect(SH12, tier1_genes)),
+    length(intersect(HW15, tier1_genes)),
+    length(intersect(SW15, tier1_genes)),
+    length(intersect(SH15, tier1_genes)),
+    length(intersect(HW18, tier1_genes)),
+    length(intersect(SW18, tier1_genes)),
+    length(intersect(SH18, tier1_genes))
+  ),
+
+  Interaction = c(
+    length(intersect(HW12, interaction_genes)),
+    length(intersect(SW12, interaction_genes)),
+    length(intersect(SH12, interaction_genes)),
+    length(intersect(HW15, interaction_genes)),
+    length(intersect(SW15, interaction_genes)),
+    length(intersect(SH15, interaction_genes)),
+    length(intersect(HW18, interaction_genes)),
+    length(intersect(SW18, interaction_genes)),
+    length(intersect(SH18, interaction_genes))
+  ),
+
+  Tier2 = c(
+    length(intersect(HW12, tier2_genes)),
+    length(intersect(SW12, tier2_genes)),
+    length(intersect(SH12, tier2_genes)),
+    length(intersect(HW15, tier2_genes)),
+    length(intersect(SW15, tier2_genes)),
+    length(intersect(SH15, tier2_genes)),
+    length(intersect(HW18, tier2_genes)),
+    length(intersect(SW18, tier2_genes)),
+    length(intersect(SH18, tier2_genes))
+  ),
+
+  Tier2b = c(
+    length(intersect(HW12, tier2b_genes)),
+    length(intersect(SW12, tier2b_genes)),
+    length(intersect(SH12, tier2b_genes)),
+    length(intersect(HW15, tier2b_genes)),
+    length(intersect(SW15, tier2b_genes)),
+    length(intersect(SH15, tier2b_genes)),
+    length(intersect(HW18, tier2b_genes)),
+    length(intersect(SW18, tier2b_genes)),
+    length(intersect(SH18, tier2b_genes))
+  )
+
+)
+
+origin_overlap <- origin_overlap |>
+  mutate(
+
+    Tier1_Percent =
+      round(
+        100 * Tier1 / length(tier1_genes),
+        1
+      ),
+
+    Interaction_Percent =
+      round(
+        100 * Interaction / length(interaction_genes),
+        1
+      ),
+
+    Tier2_Percent =
+      round(
+        100 * Tier2 / length(tier2_genes),
+        1
+      ),
+
+    Tier2b_Percent =
+      round(
+        100 * Tier2b / length(tier2b_genes),
+        1
+      )
+
+  )
+
+knitr::kable(
+  origin_overlap,
+  digits = 1,
+  caption = "Association of origin contrasts with candidate gene sets"
+)
+```
+
+Local thermal adaptation candidates (Tier 2b) were almost exclusively associated with population divergence involving Southern fish at 18°C. Forty-two of 45 candidates were detected in the Southern versus Western contrast and 37 of 45 were detected in the Southern versus Hybrid contrast, whereas none were detected in the Western versus Hybrid comparison. These results suggest that hybrids may preferentially inherit Western-like expression patterns for genes associated with local thermal adaptation.
+
+
+## Summary
+
+Differential expression analyses revealed distinct thermal response strategies among origins. Western fish exhibited extensive and persistent differential expression across warming contrasts, whereas Southern fish showed a large set of genes that were differentially expressed between 12°C and 15°C but were largely not retained at 18°C, suggesting a largely transient response centered on 15°C. Hybrid fish instead exhibited substantial retention of temperature-responsive genes at 18°C, resembling the persistent response observed in Western fish, but with substantially fewer genes differentially expressed during the 12°C to 15°C transition than either parental population and comparatively few additional changes between 15°C and 18°C.
+
+Despite pronounced origin-specific responses, a core set of 5,479 genes was temperature-responsive in all three origins, indicating a conserved thermal response across origins. Western fish nevertheless exhibited the largest overall repertoire of temperature-responsive genes (17,824 genes), containing more than 6,000 additional temperature-responsive genes relative to either Southern or Hybrid fish.
+
+Population divergence was strongly temperature dependent. Relatively few genes differed among origins at 12°C and 15°C, whereas divergence increased dramatically at 18°C.The strongest divergence occurred between Southern and Western fish, followed by Southern and Hybrid fish, while Western and Hybrid fish remained comparatively similar across all temperatures. The extensive overlap between the Southern versus Western and Southern versus Hybrid contrasts at 18°C further indicates that many of the genes differentiating hybrids from Southern fish are the same genes that differentiate the two parental populations. These results indicate that population divergence is driven primarily by the emergence of a distinct Southern transcriptional profile at elevated temperature, whereas Western and Hybrid fish remain comparatively similar.
+
+Consistent with this pattern, local thermal adaptation candidates were concentrated almost exclusively in contrasts involving Southern fish at 18°C. Forty-two of 45 candidates were detected in the Southern versus Western contrast and 37 of 45 were detected in the Southern versus Hybrid contrast, whereas none were detected in the Western versus Hybrid comparison. These results suggest that hybrids may preferentially inherit Western-like expression patterns for genes associated with local thermal adaptation.
+
+## Session Info
+```{r session_info} 
+sessionInfo()
+```
