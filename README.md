@@ -17,7 +17,8 @@ It includes:
 - Differential expression analysis across temperature and origin contrasts using DESeq2
 - Gene set selection to identify temperature-responsive, population-divergent, and hybrid gene expression inheritance patte	
 - Functional enrichment of gene sets to identify associated biological processes and pathways
- 
+- Gene expression trajectory analyses to characterize thermal response dynamics across populations and gene sets.
+
 See full details in the [Chapter 1 README](https://github.com/CarlotaMG/corkwing_wrasse/tree/main/chapter1_rnaseq).
 
 ---
