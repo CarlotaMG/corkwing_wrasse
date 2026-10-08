@@ -2,10 +2,11 @@
 
 This step identifies gene expression patterns associated with temperature, population, and hybrid inheritance in *Symphodus melops*.
 
-The workflow consists of three sequential analyses:
+The workflow consists of four sequential analyses:
 
 1. Model comparison and variance partitioning  
-2. Differential expression analysis  
+2. Differential expression analysis for gene set defenition  
+3. Pairwise differential expression analysis
 3. Hybrid inheritance analysis  
 
 ---
@@ -61,13 +62,13 @@ This analysis performs gene-level differential expression using the additive mod
 
 ~ temperature + origin + length  
 
-Pairwise contrasts are conducted across temperature and origin to define gene sets representing shared and divergent transcriptional responses.
+Temperature and origin contrasts are used to define gene sets representing shared and divergent transcriptional responses.
 
 ### Inputs
 
 - Gene-level abundance matrix  
 - Sample metadata  
-- Interaction gene list (from Step 1)  
+- Interaction-effect genes (from Step 1)  
 
 ### Outputs
 
@@ -83,7 +84,36 @@ https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/Tier_1_2_
 
 ---
 
-## 3. Hybrid Inheritance Analysis (Tier 3)
+## 3. Pairwise Differential Expression 
+
+This analysis performs gene-level differential expression using the full interaction model:
+
+~ length + origin * temperature
+
+Pairwise contrasts within origins and temperatures are used to characterize transcriptional responses across specific temperature and population comparisons, evaluate overlap and persistence among contrasts, and assess the distribution of previously defined gene sets.
+
+### Inputs
+
+- Gene-level abundance matrix
+- Sample metadata
+- Interaction-effect genes (from step 1)
+- Tier 1, 2 and 2b gene sets (from step 2)
+
+### Outputs
+
+- Differential expression results for pairwise contrasts
+- MA plots and Venn diagrams
+- Gene set distributions across pairwise contrasts
+
+### Results
+
+Full analysis report (code, plots, and summary tables):
+
+https://carlotamg.github.io/corkwing_wrasse/chapter1_rnaseq/DE_reports/pairwise_contrast.html
+
+---
+
+## 4. Hybrid Inheritance Analysis (Tier 3)
 
 This analysis characterises hybrid gene expression patterns by assigning genes to inheritance categories, including conserved, additive, parent-like, and misexpressed expression.
 
