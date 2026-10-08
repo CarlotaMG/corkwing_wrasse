@@ -10,12 +10,12 @@ This chapter explores gene expression responses to temperature in Symphodus melo
 It includes:
 
 - Guided de novo transcriptome assembly using Trinity
-- Transcript annotation using Trinotate and genome-based GFF integration
+- Transcript and gene annotation using transcriptome-based and genome-based annotation tools
 - Comparison of annotation sources
 - PCA and clustering to visualize sample structure
-- Model comparison to evaluate differential expression patterns and select models for transcript extraction across tiers
+- Model comparison to evaluate differential expression patterns and select models for gene extraction across tiers
 - Differential expression analysis across temperature and origin contrasts using DESeq2
-- Gene set selection to identify temperature-responsive, population-divergent, and hybrid gene expression inheritance patte	
+- Gene set selection to identify temperature-responsive, population-divergent, and hybrid gene expression inheritance patterns
 - Functional enrichment of gene sets to identify associated biological processes and pathways
 - Gene expression trajectory analyses to characterize thermal response dynamics across populations and gene sets.
 
