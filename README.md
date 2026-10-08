@@ -13,7 +13,7 @@ It includes:
 - Transcript and gene annotation using transcriptome-based and genome-based annotation tools
 - Comparison of annotation sources
 - PCA and clustering to visualize sample structure
-- Model comparison to evaluate differential expression patterns and select models for gene extraction across tiers
+- Model comparison to evaluate differential expression patterns and select models for defining biologically meaningful gene sets
 - Differential expression analysis across temperature and origin contrasts using DESeq2
 - Gene set selection to identify temperature-responsive, population-divergent, and hybrid gene expression inheritance patterns
 - Functional enrichment of gene sets to identify associated biological processes and pathways
