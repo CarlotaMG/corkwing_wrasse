@@ -15,7 +15,7 @@ This chapter includes:
 - Selection of gene sets representing temperature-responsive, population-divergent, and hybrid expression inheritance patterns (see [Differential Expression section](scripts/DE/README.md#gene-set-framework) for details).  
 - Functional annotation using transcriptome-based approaches and genome-based annotation integration  
 - Functional enrichment of gene sets to identify associated biological processes and pathways  
-
+- Expression trajectory analyses to characterize thermal response dynamics across populations and gene sets  
 ---
 
 ## Table of Content
@@ -25,7 +25,7 @@ This chapter includes:
 3. **[Differential Expression](scripts/DE/README.md)**  
 4. **[Annotation](scripts/annotation/README.md)**  
 5. **[Functional Enrichment](scripts/functional_enrichment/README.md)**  
-
+6. **[Expression Trajectories](scripts/expression_trajectories/README.md)**
 ---
 
 ## Project Structure
@@ -44,14 +44,17 @@ chapter1_rnaseq/
 │   ├── annotation/           # Functional annotation outputs (Trinotate, EggNOG, etc.)
 │   ├── DE/                   # Differential expression results (tables and visualizations)
 │   ├── sample_clustering/    # PCA and clustering results (plots and distance metrics)
-│   └── functional_enrichment/ # Functional enrichment results (tables and visualizations)
+│   ├── functional_enrichment/ # Functional enrichment results (tables and visualizations)
+│   └── transcriptomic_trajectories/ # Expression trajectories results (tables and plots)
 │
 ├── scripts/                  # Modular analysis workflows
 │   ├── assembly/             # Transcriptome assembly
 │   ├── annotation/           # Functional annotation (Trinotate, EggNOG, etc.)
 │   ├── DE/                   # Differential expression analysis
 │   ├── sample_clustering/    # PCA analysis
-│   └── functional_enrichment/ # Functional enrichment
+│   ├── functional_enrichment/ # Functional enrichment
+│   └── expression_trajectories/ # Expression trajectory analysis
+
 ```
 
 All paths in this chapter assume `chapter1_rnaseq/` as the working directory. Scripts are designed to be run from this location using relative paths to ensure reproducibility across systems.
