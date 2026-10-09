@@ -26,13 +26,14 @@ suppressPackageStartupMessages({
   library(DESeq2)
   library(ggrepel)
   library(readxl)
+	library(patchwork)
 })
 
 ```
 
 ## Data Import and Preprocessing
 ```{r load_data}
-# Load transcript abundance matrix
+# Load gene abundance matrix
 abundance_matrix <- read.table(
   "data/DE/abundance_matrix.txt",
   header = TRUE, row.names = 1, check.names = FALSE
@@ -126,73 +127,112 @@ barplot(var_explained,
 ```
 
 ### PCA plot function
-```{r PCA_function}
-plot_pca <- function(pcaData, percentVar, combo,
-                     color_by = "temperature", shape_by = "origin",
-                     save = FALSE, save_dir = "results/sample_clustering/PCA") {
-  x_pc <- combo[1]; y_pc <- combo[2]
-  
-  p <- ggplot(pcaData, aes_string(
-    x = paste0("PC", x_pc),
-    y = paste0("PC", y_pc),
-    color = color_by,
-    shape = shape_by
-  )) +
+```{r}
+
+# Color palette
+
+origin_colors <- c(
+  "West"   = "#8da0cb",  # lavender
+  "Hybrid" = "#66c2a5",  # turquoise
+  "South"  = "#fc8d62"   # salmon
+)
+
+temperature_colors <- c(
+  "12" = "#4C78A8",  # muted blue
+  "15" = "#B279A2",  # muted purple
+  "18" = "#E45756"   # muted red
+)
+
+# PCA plot function
+plot_pca <- function(
+    pcaData,
+    percentVar,
+    combo,
+    color_by = "temperature",
+    shape_by = "origin",
+    ellipse = FALSE,
+    save = FALSE,
+    save_dir = "results/sample_clustering/PCA"
+) {
+
+  x_pc <- combo[1]
+  y_pc <- combo[2]
+
+  p <- ggplot(
+    pcaData,
+    aes_string(
+      x = paste0("PC", x_pc),
+      y = paste0("PC", y_pc),
+      color = color_by,
+      shape = shape_by
+    )
+  ) +
     geom_point(size = 3) +
-    xlab(paste0("PC", x_pc, ": ", percentVar[x_pc], "% variance")) +
-    ylab(paste0("PC", y_pc, ": ", percentVar[y_pc], "% variance")) +
-    ggtitle(paste0("PCA colored by ", color_by,
-                   " (PC", x_pc, " vs PC", y_pc, ")")) +
-    theme_minimal() +
-    scale_color_manual(values = c(
-      "12" = "blue", "15" = "green", "18" = "red",
-      "Hybrid" = "purple", "South" = "orange", "West" = "darkgreen"
-    )) +
-    scale_shape_manual(values = c("Hybrid" = 16, "South" = 17, "West" = 18,
-                                  "12" = 16, "15" = 17, "18" = 18))
-  
+    xlab(paste0("PC", x_pc, " (", percentVar[x_pc], "% variance)")) +
+    ylab(paste0("PC", y_pc, " (", percentVar[y_pc], "% variance)")) +
+    theme_minimal(base_size = 14) +
+    scale_color_manual(
+  	values = temperature_colors
+		) +
+    scale_shape_manual(values = c(
+      "Hybrid" = 16,
+      "South"  = 17,
+      "West"   = 18,
+      "12"     = 16,
+      "15"     = 17,
+      "18"     = 18
+    ))
+
+  if (ellipse) {
+    p <- p +
+      stat_ellipse(
+        aes(group = temperature),
+        type = "t",
+        level = 0.95,
+        linetype = 2
+      )
+  }
+
   print(p)
-  
+
   if (save) {
     ggsave(
-      filename = file.path(save_dir,
-        paste0("PCA_", color_by, "_PC", x_pc, "_vs_PC", y_pc, ".png")),
-      plot = p, width = 8, height = 6, dpi = 300
+      filename = file.path(
+        save_dir,
+        paste0(
+          "PCA_",
+          color_by,
+          "_PC", x_pc,
+          "_vs_PC", y_pc,
+          ifelse(ellipse, "_ellipse", ""),
+          ".png"
+        )
+      ),
+      plot = p,
+      width = 8,
+      height = 6,
+      dpi = 300
     )
   }
 }
 ```
 
-
-### Generate PCA Plots
-```{r plot_PCA}
+### Generate PCA plots
+```{r}
 pc_combos <- list(c(1,2), c(1,3), c(2,3))
 
-# Temperature as color, origin as shape
 for (combo in pc_combos) {
-  plot_pca(pcaData, percentVar, combo, color_by = "temperature", shape_by = "origin", save = TRUE)
+  plot_pca(
+    pcaData,
+    percentVar,
+    combo,
+    color_by = "temperature",
+    shape_by = "origin",
+    ellipse = TRUE,
+    save = TRUE
+  )
 }
-
-# Origin as color, temperature as shape
-for (combo in pc_combos) {
-  plot_pca(pcaData, percentVar, combo, color_by = "origin", shape_by = "temperature", save = TRUE)
-}
-
 ```
-
-### PC1 vs PC2 Scatterplot Highlighting Temperature Clustering
-```{r}
-ggplot(corData, aes(x = PC1, y = PC2,
-                    color = temperature, shape = origin)) +
-  geom_point(size = 3) +
-  stat_ellipse(aes(group = temperature),
-               type = "t", level = 0.95, linetype = 2) +
-  labs(title = "PCA of transcriptomic profiles",
-       x = paste0("PC1 (", round(summary(pca)$importance[2,1]*100, 1), "% variance)"),
-       y = paste0("PC2 (", round(summary(pca)$importance[2,2]*100, 1), "% variance)")) +
-  theme_minimal()
-```
-
 
 Principal Component Analysis revealed that temperature was the dominant driver of transcriptomic variation, with clear clustering along PC1 (17.3% of variance) and PC2 (7%). In contrast, no distinct clustering by population origin (West, Hybrid, South) was observed. Two South individuals exposed to 18°C did not cluster together: one grouped with the 12°C cluster and the other with the 15°C cluster. Likewise, one Hybrid individual at 18°C clustered with the 15°C group, while another Hybrid at 15°C clustered with the 18°C group. These atypical placements suggest that South individuals do not consistently activate distinct transcriptional programs under the 18°C treatment, and that Hybrids may inherit part of this response pattern. Overall, the PCA highlights temperature‑driven clustering with a few notable deviations, which will be further clarified in downstream differential expression analyses.
 
@@ -268,39 +308,85 @@ knitr::kable(cor_table_PC2, digits = 3,
 Spearman correlation tests showed that PC2 was not significantly associated with length (ρ = –0.11, p = 0.51), weight (ρ = –0.18, p = 0.28), or condition factor (ρ = –0.08, p = 0.64).
 
 ### Scatterplots of PC1 vs Morphometric Traits
-```{r plot_PC1_vs_morphometrics}
-# PC1 vs Length
-ggplot(corData, aes(x = PC1, y = length,
-                    color = temperature, shape = origin)) +
-  geom_point(size = 3) +
-  geom_smooth(method = "lm", se = FALSE, color = "black", aes(group = 1)) +
-  labs(title = paste0("PC1 vs Length (Spearman rho = ",
-                      round(cor_results$PC1_vs_Length$estimate, 2), ")"),
-       x = "PC1 score", y = "Total Length (mm)") +
-  theme_minimal()
 
-# PC1 vs Weight
-ggplot(corData, aes(x = PC1, y = weight,
-                    color = temperature, shape = origin)) +
-  geom_point(size = 3) +
-  geom_smooth(method = "lm", se = FALSE, color = "black", aes(group = 1)) +
-  labs(title = paste0("PC1 vs Weight (Spearman rho = ",
-                      round(cor_results$PC1_vs_Weight$estimate, 2), ")"),
-       x = "PC1 score", y = "Weight (g)") +
-  theme_minimal()
+```{r plot_PC1_vs_morphometrics, fig.width=18, fig.height=6}
 
-# PC1 vs Condition Factor
-ggplot(corData, aes(x = PC1, y = condition_factor,
-                    color = temperature, shape = origin)) +
-  geom_point(size = 3) +
-  geom_smooth(method = "lm", se = FALSE, color = "black", aes(group = 1)) +
-  labs(title = paste0("PC1 vs Condition Factor (Spearman rho = ",
-                      round(cor_results$PC1_vs_CF$estimate, 2), ")"),
-       x = "PC1 score", y = "Condition Factor (K)") +
-  theme_minimal()
+# Plotting function
+plot_pc_trait <- function(data, pc, trait, rho, pval){
+
+  ggplot(
+    data,
+    aes_string(
+      x = pc,
+      y = trait,
+      color = "temperature",
+      shape = "origin"
+    )
+  ) +
+    geom_point(size = 3) +
+    geom_smooth(
+      method = "lm",
+      se = FALSE,
+      color = "black",
+      aes(group = 1)
+    ) +
+    scale_color_manual(values = temperature_colors) +
+    theme_minimal(base_size = 14) +
+    labs(
+      x = paste0(pc, " score"),
+      y = trait,
+      subtitle = paste0(
+        "Spearman rho = ",
+        round(rho, 2),
+        ", p = ",
+        signif(pval, 3)
+      )
+    )
+}
+
+# PC1 vs length
+p_length <- plot_pc_trait(
+  corData,
+  "PC1",
+  "length",
+  cor_results$PC1_vs_Length$estimate,
+  cor_results$PC1_vs_Length$p.value
+)
+
+# PC1 vs weight
+p_weight <- plot_pc_trait(
+  corData,
+  "PC1",
+  "weight",
+  cor_results$PC1_vs_Weight$estimate,
+  cor_results$PC1_vs_Weight$p.value
+)
+
+# PC1 vs condition factor
+p_cf <- plot_pc_trait(
+  corData,
+  "PC1",
+  "condition_factor",
+  cor_results$PC1_vs_CF$estimate,
+  cor_results$PC1_vs_CF$p.value
+)
+
+library(patchwork)
+
+supp_fig <- (
+  p_length +
+    theme(legend.position = "none")
+) | (
+  p_weight +
+    theme(legend.position = "none")
+) | (
+  p_cf +
+    theme(legend.position = "right")
+)
+
+supp_fig
+
 ```
-
-
 Scatterplots of PC1 against condition factor, length, and weight were overlaid with regression lines to visualize potential associations. The regression line for condition factor was flat, indicating that relative body condition (K) does not contribute to the transcriptomic variation captured by PC1. In contrast, PC1 showed upward slopes with both length and weight, consistent with the significant Spearman correlations, and suggesting that developmental stage contributes to the observed variation. This indicates that developmental stage, rather than nutritional status or energy reserves, explains the clustering pattern. Because length and weight are highly collinear, we included length as a covariate in downstream differential expression models to control for developmental stage effects. Length was chosen over weight because it provides a more stable and biologically interpretable measure of growth stage, whereas weight can fluctuate with short‑term physiological factors.
 
 Overall, these results highlight temperature as the dominant factor shaping transcriptomic profiles, while no clear clustering by population origin was observed. Length and weight correlated with variation along PC1, consistent with developmental stage effects, underscoring the need to account for growth when interpreting differential expression patterns.
@@ -312,3 +398,14 @@ sessionInfo()
 ```
 
 
+```{r save_morphometric_figure, include=FALSE}
+
+ggsave(
+  "results/sample_clustering/PCA/Supplementary_Figure_S4_PC1_morphometrics.png",
+  supp_fig,
+  width = 18,
+  height = 6,
+  dpi = 300
+)
+
+```
