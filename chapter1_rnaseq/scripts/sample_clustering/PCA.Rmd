@@ -125,6 +125,7 @@ barplot(var_explained,
         ylab = "Percentage of variance",
         col = "steelblue")
 ```
+
 The first three principal components explained 17.3%, 7.0%, and 5.4% of the total variance, respectively, accounting for 29.7% of the overall transcriptomic variation among samples. Because these components captured the largest proportion of variation, subsequent PCA visualizations focused on combinations of PC1, PC2, and PC3 to examine the major axes of transcriptomic structure.
 
 ### PCA plot function
