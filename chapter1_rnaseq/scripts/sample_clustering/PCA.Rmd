@@ -127,8 +127,8 @@ barplot(var_explained,
 ```
 
 ### PCA plot function
-```{r}
 
+```{r PCA_plot_func}
 # Color palette
 
 origin_colors <- c(
@@ -158,6 +158,12 @@ plot_pca <- function(
   x_pc <- combo[1]
   y_pc <- combo[2]
 
+  color_palette <- if (color_by == "temperature") {
+    temperature_colors
+  } else {
+    origin_colors
+  }
+
   p <- ggplot(
     pcaData,
     aes_string(
@@ -170,10 +176,7 @@ plot_pca <- function(
     geom_point(size = 3) +
     xlab(paste0("PC", x_pc, " (", percentVar[x_pc], "% variance)")) +
     ylab(paste0("PC", y_pc, " (", percentVar[y_pc], "% variance)")) +
-    theme_minimal(base_size = 14) +
-    scale_color_manual(
-  	values = temperature_colors
-		) +
+    scale_color_manual(values = color_palette) +
     scale_shape_manual(values = c(
       "Hybrid" = 16,
       "South"  = 17,
@@ -181,14 +184,19 @@ plot_pca <- function(
       "12"     = 16,
       "15"     = 17,
       "18"     = 18
-    ))
+    )) +
+    theme_minimal(base_size = 14)
 
   if (ellipse) {
     p <- p +
       stat_ellipse(
-        aes(group = temperature),
+        aes_string(
+          group = color_by,
+          color = color_by
+        ),
         type = "t",
         level = 0.95,
+        linewidth = 0.8,
         linetype = 2
       )
   }
@@ -215,27 +223,114 @@ plot_pca <- function(
     )
   }
 }
+
 ```
 
 ### Generate PCA plots
-```{r}
+
+#### Temperature coloring
+
+```{r PCA_temperature_panel, fig.width=18, fig.height=6}
+
 pc_combos <- list(c(1,2), c(1,3), c(2,3))
 
-for (combo in pc_combos) {
-  plot_pca(
+temp_plots <- lapply(pc_combos, function(combo) {
+
+  x_pc <- combo[1]
+  y_pc <- combo[2]
+
+  ggplot(
     pcaData,
-    percentVar,
-    combo,
-    color_by = "temperature",
-    shape_by = "origin",
-    ellipse = TRUE,
-    save = TRUE
+    aes_string(
+      x = paste0("PC", x_pc),
+      y = paste0("PC", y_pc),
+      color = "temperature",
+      shape = "origin"
+    )
+  ) +
+    geom_point(size = 3) +
+    stat_ellipse(
+      aes(group = temperature, color = temperature),
+      type = "t",
+      level = 0.95,
+      linewidth = 0.8,
+      linetype = 2
+    ) +
+    scale_color_manual(values = temperature_colors) +
+    scale_shape_manual(values = c(
+      "Hybrid" = 16,
+      "South"  = 17,
+      "West"   = 18
+    )) +
+    xlab(paste0("PC", x_pc, " (", percentVar[x_pc], "% variance)")) +
+    ylab(paste0("PC", y_pc, " (", percentVar[y_pc], "% variance)")) +
+    theme_minimal(base_size = 14)
+})
+
+temp_panel <- wrap_plots(
+  temp_plots,
+  ncol = 3,
+  guides = "collect"
+) &
+  theme(
+    legend.position = "right"
   )
-}
+
+temp_panel
+
 ```
+PCA revealed strong separation among temperature treatments. Samples exposed to 12°C formed a distinct cluster, while 15°C and 18°C samples were more closely positioned in multivariate expression space and exhibited partial overlap. This pattern suggests that the largest transcriptomic shift occurred between 12°C and the warmer temperature treatments, whereas the transition from 15°C to 18°C involved comparatively smaller changes in global gene expression.
 
-Principal Component Analysis revealed that temperature was the dominant driver of transcriptomic variation, with clear clustering along PC1 (17.3% of variance) and PC2 (7%). In contrast, no distinct clustering by population origin (West, Hybrid, South) was observed. Two South individuals exposed to 18°C did not cluster together: one grouped with the 12°C cluster and the other with the 15°C cluster. Likewise, one Hybrid individual at 18°C clustered with the 15°C group, while another Hybrid at 15°C clustered with the 18°C group. These atypical placements suggest that South individuals do not consistently activate distinct transcriptional programs under the 18°C treatment, and that Hybrids may inherit part of this response pattern. Overall, the PCA highlights temperature‑driven clustering with a few notable deviations, which will be further clarified in downstream differential expression analyses.
+#### Origin coloring
 
+```{r PCA_origin_panel, fig.width=18, fig.height=6}
+
+origin_plots <- lapply(pc_combos, function(combo) {
+
+  x_pc <- combo[1]
+  y_pc <- combo[2]
+
+  ggplot(
+    pcaData,
+    aes_string(
+      x = paste0("PC", x_pc),
+      y = paste0("PC", y_pc),
+      color = "origin",
+      shape = "temperature"
+    )
+  ) +
+    geom_point(size = 3) +
+    stat_ellipse(
+      aes(group = origin, color = origin),
+      type = "t",
+      level = 0.95,
+      linewidth = 0.8,
+      linetype = 2
+    ) +
+    scale_color_manual(values = origin_colors) +
+    scale_shape_manual(values = c(
+      "12" = 16,
+      "15" = 17,
+      "18" = 18
+    )) +
+    xlab(paste0("PC", x_pc, " (", percentVar[x_pc], "% variance)")) +
+    ylab(paste0("PC", y_pc, " (", percentVar[y_pc], "% variance)")) +
+    theme_minimal(base_size = 14)
+})
+
+origin_panel <- wrap_plots(
+  origin_plots,
+  ncol = 3,
+  guides = "collect"
+) &
+  theme(
+    legend.position = "right"
+  )
+
+origin_panel
+
+```
+Population origin contributed a weaker component of transcriptomic variation than temperature. In the PC1-PC2 projection, Hybrid samples clustered within the range of variation observed for West individuals, whereas South samples tended to occupy a more distinct region of the ordination space. Despite this pattern, substantial overlap remained among all origin groups.
 
 ## Correlation Analyses
 
@@ -387,18 +482,74 @@ supp_fig <- (
 supp_fig
 
 ```
-Scatterplots of PC1 against condition factor, length, and weight were overlaid with regression lines to visualize potential associations. The regression line for condition factor was flat, indicating that relative body condition (K) does not contribute to the transcriptomic variation captured by PC1. In contrast, PC1 showed upward slopes with both length and weight, consistent with the significant Spearman correlations, and suggesting that developmental stage contributes to the observed variation. This indicates that developmental stage, rather than nutritional status or energy reserves, explains the clustering pattern. Because length and weight are highly collinear, we included length as a covariate in downstream differential expression models to control for developmental stage effects. Length was chosen over weight because it provides a more stable and biologically interpretable measure of growth stage, whereas weight can fluctuate with short‑term physiological factors.
+Scatterplots of PC1 against condition factor, length, and weight were overlaid with regression lines to visualize potential associations. The regression line for condition factor was flat, indicating that relative body condition (K) was not associated with the transcriptomic variation captured by PC1. In contrast, PC1 showed positive relationships with both length and weight, consistent with the significant Spearman correlations and suggesting that body size contributes to the observed variation. Together, these results suggest that developmental stage, as reflected by differences in body size, is more closely associated with the variation captured by PC1 than variation in nutritional status or energy reserves. Because length and weight are highly collinear, we included length as a covariate in downstream differential expression models to account for developmental stage effects. Length was chosen over weight because it provides a more stable and biologically interpretable measure of growth stage, whereas weight can fluctuate with short‑term physiological factors.
 
-Overall, these results highlight temperature as the dominant factor shaping transcriptomic profiles, while no clear clustering by population origin was observed. Length and weight correlated with variation along PC1, consistent with developmental stage effects, underscoring the need to account for growth when interpreting differential expression patterns.
+## Summary 
 
+PCA identified temperature as the dominant source of transcriptomic variation. The first two principal components explained 17.3% and 7.0% of the variance, respectively. Samples exposed to 12°C formed a distinct cluster, whereas the 15°C and 18°C treatments occupied more similar regions of multivariate expression space and showed partial overlap. Population origin contributed a weaker component of variation. In the PC1-PC2 projection, Hybrid samples clustered within the range of variation observed for West individuals, whereas South samples tended to occupy a more distinct region of the ordination space. Despite this pattern, substantial overlap remained among all origin groups.
+
+PC1 was significantly associated with both length and weight, suggesting that variation related to body size contributes to transcriptomic variation among samples. In contrast, condition factor showed no association with the principal components. Because length and weight were highly correlated, length was retained as the preferred proxy for developmental stage and used as a covariate in downstream differential expression analyses.
+
+Together, these results indicate that temperature is the primary factor structuring transcriptomic profiles in *Symphodus melops*. Population origin contributed weaker transcriptomic structure, while variation in body size was associated with PC1, supporting the inclusion of length as a covariate in downstream differential expression analyses.
 
 ## Session Info
 ```{r session_info} 
 sessionInfo()
 ```
 
+```{r save_figures, include=FALSE}
 
-```{r save_morphometric_figure, include=FALSE}
+# -----------------------------
+# PCA panels
+# -----------------------------
+
+ggsave(
+  "results/sample_clustering/PCA/PCA_origin_panel.png",
+  origin_panel,
+  width = 18,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/sample_clustering/PCA/PCA_temperature_panel.png",
+  temp_panel,
+  width = 18,
+  height = 6,
+  dpi = 300
+)
+
+# -----------------------------
+# Individual PCA plots
+# -----------------------------
+
+for (combo in pc_combos) {
+
+  plot_pca(
+    pcaData,
+    percentVar,
+    combo,
+    color_by = "origin",
+    shape_by = "temperature",
+    ellipse = TRUE,
+    save = TRUE
+  )
+
+  plot_pca(
+    pcaData,
+    percentVar,
+    combo,
+    color_by = "temperature",
+    shape_by = "origin",
+    ellipse = TRUE,
+    save = TRUE
+  )
+
+}
+
+# -----------------------------
+# Morphometric panel
+# -----------------------------
 
 ggsave(
   "results/sample_clustering/PCA/Supplementary_Figure_S4_PC1_morphometrics.png",
