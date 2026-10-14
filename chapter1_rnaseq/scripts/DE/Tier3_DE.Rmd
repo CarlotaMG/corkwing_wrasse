@@ -15,6 +15,19 @@ knitr::opts_knit$set(
   root.dir   = here::here())
 ```
 
+## Introduction
+
+Tier 3 focuses on expression inheritance in corkwing wrasse hybrids across three temperature treatments (12°C, 15°C, and 18°C). By comparing hybrid expression profiles with those of the South and West parental populations, transcripts were classified into inheritance categories including conserved, additive, parent-like, and misexpressed expression patterns.
+
+Differential expression analyses were performed between hybrids and each parental population, as well as between parental populations within each temperature treatment. These contrasts were then used to classify transcripts according to their inheritance pattern and to evaluate how these patterns vary across temperatures.
+
+The objectives of this analysis were to:
+
+(1) Classify transcripts according to patterns of expression inheritance in hybrids.
+
+(2) Evaluate the consistency of inheritance patterns across temperatures.
+
+(3) Compare Tier 3 candidate genes with those identified in Tier 1 (conserved temperature responses) and Tier 2b (local adaptation candidates).
 
 ## Package Loading
 ```{r packages}
@@ -28,6 +41,8 @@ suppressPackageStartupMessages({
   library(ggVennDiagram)
   library(DT)
 	library(here)
+	library(ggplot2)
+	library(patchwork)
 })
 
 ```
@@ -255,10 +270,10 @@ Expression patterns
 └── Misexpression
       (H is DE from BOTH pure lines)
       |
-      ├── Within‑range misregulated
+      ├── Within‑range misexpressed
       │     (H between S and W)
       │
-      └── Outside‑range misregulated (Transgressive)
+      └── Outside‑range misexpressed (Transgressive)
             ├── Transgressive up
             └── Transgressive down
 ```
@@ -328,17 +343,17 @@ classify_expression <- function(temp) {
   category[parent_like_W]   <- "parent_like_W"
   
   # Misexpression
-  misregulated <- DE_HS & DE_HW
+  misexpressed <- DE_HS & DE_HW
   
-  within_mis <- misregulated & H_between
-  trans_up   <- misregulated & H_above
-  trans_down <- misregulated & H_below
+  within_mis <- misexpressed & H_between
+  trans_up   <- misexpressed & H_above
+  trans_down <- misexpressed & H_below
   
-  category[within_mis] <- "within_range_misregulated"
+  category[within_mis] <- "within_range_misexpressed"
   category[trans_up]   <- "transgressive_up"
   category[trans_down] <- "transgressive_down"
   
-  category[misregulated & !(within_mis | trans_up | trans_down)] <- "misregulated_other"
+  category[misexpressed & !(within_mis | trans_up | trans_down)] <- "misexpression_other"
   
   DE$category    <- category
   DE$temperature <- temp
@@ -418,7 +433,7 @@ knitr::kable(other_15, caption = "Decomposition of 'other' isoforms at 15°C")
 knitr::kable(other_18, caption = "Decomposition of 'other' isoforms at 18°C")
 ```
 
-We decomposed the heterogeneous ‘other’ category into interpretable subgroups. Isoforms classified as only_HS or only_HW showed asymmetric divergence, differing from one parent but not the other, but were not considered parent‑like because parental divergence was absent. The only_SW group captured parental divergence without hybrid divergence. Discordant cases represented hybrids positioned between parents yet still significantly diverging from one or both. The majority of isoforms did not meet these definitions and are reported as a residual group, reflecting missing values or heterogeneous patterns that cannot be assigned to a specific inheritance category under our criteria.
+We decomposed the heterogeneous ‘other’ category into interpretable subgroups. Isoforms classified as only_HS or only_HW showed asymmetric divergence, differing from one parent but not the other, but were not considered parent‑like because parental divergence was absent. The only_SW group captured parental divergence without hybrid divergence. Discordant cases represented hybrids positioned between parents yet still significantly diverging from one or both. The majority of isoforms within the "other" category did not meet these definitions and are therefore reported as a residual group, reflecting missing values or heterogeneous patterns that cannot be assigned to a specific inheritance category under our criteria.
 
 ## Summary of expression categories across temperatures
 ```{r summarize_categories}
@@ -431,14 +446,67 @@ summary_table
 
 ```
 
-
 ## Visualization: Stacked barplot of categories per temperature
 ```{r plot_categories}
 
-library(ggplot2)
+tier3_colors <- c(
+  "conserved"                 = "#E5F5E0",
+  "additive"                  = "#FEE0D2",
+  "other"                     = "#F0F0F0",
 
-ggplot(DE_all, aes(x = factor(temperature), fill = category)) +
+  "parent_like_W"             = "#8da0cb",
+  "parent_like_S"             = "#fc8d62",
+
+  "within_range_misexpressed" = "#99FF99",
+  "transgressive_up"          = "#E6AB02",
+  "transgressive_down"        = "#FFD92F"
+)
+
+DE_all_plot <- DE_all %>%
+  mutate(
+    category = factor(
+      category,
+      levels = c(
+        "conserved",
+        "additive",
+        "other",
+        "parent_like_W",
+        "parent_like_S",
+        "transgressive_up",
+        "transgressive_down",
+        "within_range_misexpressed"
+      )
+    )
+  )
+
+p_categories <- ggplot(
+  DE_all_plot,
+  aes(x = factor(temperature), fill = category)
+) +
   geom_bar(position = "fill") +
+  scale_fill_manual(
+    values = tier3_colors,
+    breaks = c(
+      "conserved",
+      "additive",
+      "other",
+      "parent_like_W",
+      "parent_like_S",
+      "transgressive_up",
+      "transgressive_down",
+      "within_range_misexpressed"
+    ),
+    labels = c(
+      "Conserved",
+      "Additive",
+      "Other",
+      "West-like",
+      "South-like",
+      "Transgressive up",
+      "Transgressive down",
+      "Within-range misexpressed"
+    )
+  ) +
   scale_y_continuous(labels = scales::percent) +
   labs(
     x = "Temperature (°C)",
@@ -447,6 +515,9 @@ ggplot(DE_all, aes(x = factor(temperature), fill = category)) +
     title = "Distribution of expression inheritance categories across temperatures"
   ) +
   theme_minimal()
+
+p_categories
+
 ```
 
 
@@ -457,15 +528,51 @@ At 12°C, balanced replication (n=5 per origin) meant that DESeq2 produced valid
 ## Visualization: Focus on rare categories
 ```{r plot_rare_categories}
 
-rare_cats <- c("parent_like_S", "parent_like_W",
-               "transgressive_up", "transgressive_down",
-               "within_range_misregulated")
+rare_cats <- c(
+  "parent_like_S",
+  "parent_like_W",
+  "transgressive_up",
+  "transgressive_down",
+  "within_range_misexpressed"
+)
 
-DE_rare <- DE_all %>% 
-  filter(category %in% rare_cats)
+DE_rare <- DE_all %>%
+  filter(category %in% rare_cats) %>%
+  mutate(
+    category = factor(
+      category,
+      levels = c(
+        "parent_like_W",
+        "parent_like_S",
+        "transgressive_up",
+        "transgressive_down",
+        "within_range_misexpressed"
+      )
+    )
+  )
 
-ggplot(DE_rare, aes(x = factor(temperature), fill = category)) +
+p_rare <- ggplot(
+  DE_rare,
+  aes(x = factor(temperature), fill = category)
+) +
   geom_bar(position = "stack") +
+  scale_fill_manual(
+    values = tier3_colors,
+    breaks = c(
+      "parent_like_W",
+      "parent_like_S",
+      "transgressive_up",
+      "transgressive_down",
+      "within_range_misexpressed"
+    ),
+    labels = c(
+      "West-like",
+      "South-like",
+      "Transgressive up",
+      "Transgressive down",
+      "Within-range misexpressed"
+    )
+  ) +
   labs(
     x = "Temperature (°C)",
     y = "Number of isoforms",
@@ -473,22 +580,34 @@ ggplot(DE_rare, aes(x = factor(temperature), fill = category)) +
     title = "Rare inheritance categories across temperatures"
   ) +
   theme_minimal()
+
+p_rare
 ```
 
-Most misregulated isoforms in hybrids show transgressive expression, meaning hybrid expression lies outside the parental range. Transgressive misexpression is the most extreme form of regulatory incompatibility and is often associated with reduced hybrid fitness.
+Most misexpressed isoforms in hybrids show transgressive expression, meaning hybrid expression lies outside the parental range. Transgressive misexpression is widely regarded as the most extreme departure from parental expression and is frequently associated with regulatory incompatibilities and reduced hybrid fitness.
 
 ## Export ALL misexpressed isoforms per temperature (combined)
 ```{r export_misexpressed_combined}
+## Export ALL misexpressed isoforms per temperature (combined)
 
 # Ensure output directory exists
-dir.create("results/DE/tier3_DE/misexpressed", recursive = TRUE, showWarnings = FALSE)
+dir.create("results/DE/tier3_DE/misexpressed",
+           recursive = TRUE,
+           showWarnings = FALSE)
 
-mis_cats <- c("transgressive_up", "transgressive_down", "within_range_misregulated")
+mis_cats <- c(
+  "transgressive_up",
+  "transgressive_down",
+  "within_range_misexpressed"
+)
 
 for (temp in c(12, 15, 18)) {
 
   iso <- DE_all %>%
-    filter(temperature == temp, category %in% mis_cats) %>%
+    filter(
+      temperature == temp,
+      category %in% mis_cats
+    ) %>%
     pull(isoform) %>%
     unique()
 
@@ -500,11 +619,13 @@ for (temp in c(12, 15, 18)) {
     col.names = FALSE
   )
 }
+
 ```
 
 
 ## Export parent like isoforms per temperature
 ```{r export_parent_like}
+
 # Ensure output directory exists
 dir.create("results/DE/tier3_DE/parent_like", recursive = TRUE, showWarnings = FALSE)
 
@@ -557,44 +678,49 @@ for (temp in c(12, 15, 18)) {
 knitr::kable(contrast_summary, caption = "Counts of DE isoforms per contrast and temperature")
 ```
 
-## Misexpressed isoforms overlap
-```{r missexpress_overlap}
-# Read misexpressed isoforms per temperature
-mis_list <- list(
-  `12°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_12C.tsv", header = FALSE)$V1,
-  `15°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_15C.tsv", header = FALSE)$V1,
-  `18°C` = read.delim("results/DE/tier3_DE/misexpressed/misexpressed_18C.tsv", header = FALSE)$V1
-)
+## Isoform-level overlap across temperatures
+```{r venn_isoforms_combined, fig.width=15, fig.height=5}
 
-# Plot
-ggVennDiagram(mis_list, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#0072B2") +
-  ggtitle("Overlap of Misexpressed Isoforms Across Temperatures")
-```
-## Parent‑like S overlap
-```{r S_like_overlap}
-pls_list <- list(
-  `12°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_12C.tsv", header = FALSE)$V1,
-  `15°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_15C.tsv", header = FALSE)$V1,
-  `18°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_S_18C.tsv", header = FALSE)$V1
-)
+p_mis_iso <-
+  ggVennDiagram(mis_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#E6AB02") +
+  ggtitle("Misexpressed") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
 
-ggVennDiagram(pls_list, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#009E73") +
-  ggtitle("Overlap of Parent-like S Isoforms Across Temperatures")
-```
+p_s_iso <-
+  ggVennDiagram(pls_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#fc8d62") +
+  ggtitle("South-like") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
 
-## Parent‑like W overlap
-```{r W_like_overlap}
-plw_list <- list(
-  `12°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_12C.tsv", header = FALSE)$V1,
-  `15°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_15C.tsv", header = FALSE)$V1,
-  `18°C` = read.delim("results/DE/tier3_DE/parent_like/parent_like_W_18C.tsv", header = FALSE)$V1
-)
+p_w_iso <-
+  ggVennDiagram(plw_list, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#8da0cb") +
+  ggtitle("West-like") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
 
-ggVennDiagram(plw_list, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#D55E00") +
-  ggtitle("Overlap of Parent-like W Isoforms Across Temperatures")
+p_venn_isoforms <- p_mis_iso | p_s_iso | p_w_iso
+
+p_venn_isoforms
+
 ```
 
 ## Define Tier 3 DE file paths
@@ -711,51 +837,55 @@ datatable(
 
 ```
 
-## Gene-level Venn diagram for misexpressed genes
-```{r misexpresses_venn_genes}
-mis_genes <- list(
-  `12°C` = gene_lists$misexpressed_12C,
-  `15°C` = gene_lists$misexpressed_15C,
-  `18°C` = gene_lists$misexpressed_18C
-)
 
-ggVennDiagram(mis_genes, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#0072B2") +
-  ggtitle("Overlap of Misexpressed Genes Across Temperatures")
+## Gene-level overlap across temperatures
+```{r venn_genes_combined, fig.width=15, fig.height=5}
+
+p_mis_gene <-
+  ggVennDiagram(mis_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#E6AB02") +
+  ggtitle("Misexpressed") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
+
+p_s_gene <-
+  ggVennDiagram(pls_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#fc8d62") +
+  ggtitle("South-like") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
+
+p_w_gene <-
+  ggVennDiagram(plw_genes, label_alpha = 0) +
+  scale_fill_gradient(low = "white", high = "#8da0cb") +
+  ggtitle("West-like") +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold"
+    )
+  )
+
+p_venn_genes <- p_mis_gene | p_s_gene | p_w_gene
+
+p_venn_genes
+
 ```
-
 
 The number of misexpressed genes remains relatively stable across temperatures, suggesting that hybrid misregulation is not strongly temperature‑dependent but represents a consistent background of regulatory incompatibility. 
 
-## Gene-level Venn diagram for parent-like S genes
-```{r S_like_venn_genes}
-pls_genes <- list(
-  `12°C` = gene_lists$parent_like_S_12C,
-  `15°C` = gene_lists$parent_like_S_15C,
-  `18°C` = gene_lists$parent_like_S_18C
-)
-
-ggVennDiagram(pls_genes, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#009E73") +
-  ggtitle("Overlap of Parent-like S Genes Across Temperatures")
-```
-
-
 South‑like inheritance shows a dip at 15°C but is otherwise similar across temperature treatments.
-
-## Gene-level Venn diagram for parent-like W genes
-```{r W_like_venn_genes}
-plw_genes <- list(
-  `12°C` = gene_lists$parent_like_W_12C,
-  `15°C` = gene_lists$parent_like_W_15C,
-  `18°C` = gene_lists$parent_like_W_18C
-)
-
-ggVennDiagram(plw_genes, label_alpha = 0) +
-  scale_fill_gradient(low = "white", high = "#D55E00") +
-  ggtitle("Overlap of Parent-like W Genes Across Temperatures")
-```
-
 
 West‑like inheritance increases markedly with temperature, indicating a stronger tendency for hybrids to inherit a western population expression under warmer conditions.
 
@@ -869,6 +999,7 @@ DT::datatable(
   caption = "Summary of Tier 1 and Tier 2b Intersections with Tier 3 Categories"
 )
 ```
+
 ```{r save_intersections, echo=FALSE, results='hide'}
 write_csv(tibble(gene_id = tier1_misexpressed),  "results/functional_enrichment/tier_intersections/tier1_tier3_misexpressed.csv")
 write_csv(tibble(gene_id = tier1_parent_like_S), "results/functional_enrichment/tier_intersections/tier1_tier3_parent_like_S.csv")
@@ -901,6 +1032,18 @@ DT::datatable(
 )
 ```
 
+## Summary
+
+Most classified isoforms fell into the conserved and additive categories, indicating that hybrid expression was generally similar to or intermediate between parental expression levels.
+
+Most misexpressed isoforms in hybrids showed transgressive expression, meaning that hybrid expression lay outside the parental range. Transgressive misexpression is widely regarded as the most extreme departure from parental expression and is frequently associated with regulatory incompatibilities and reduced hybrid fitness.
+
+The number of misexpressed genes remained relatively stable across temperatures, suggesting that hybrid misexpression is not strongly temperature‑dependent and represents a consistent feature of hybrid gene expression. South‑like inheritance showed a dip at 15°C but was otherwise similar across temperature treatments, while West‑like inheritance increased markedly with temperature, indicating a stronger tendency for hybrids to inherit western population expression under warmer conditions.
+
+The limited overlap across temperature treatments suggests that distinct gene sets are involved at each temperature, indicating temperature‑specific regulation rather than a fixed set of misexpressed or parent‑like genes.
+
+Intersections with Tier 1 and Tier 2b identified twenty‑three misexpressed genes from the conserved temperature‑response gene set and a single misexpressed gene from the local adaptation candidate set. West‑like inheritance showed the largest overlap with both Tier 1 and Tier 2b genes, suggesting that many genes associated with thermal responses also exhibit West‑like expression patterns in hybrids.
+
 
 ## Session Info
 ```{r session_info} 
@@ -908,3 +1051,88 @@ sessionInfo()
 ```
 
 
+```{r save_figures, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+
+dir.create(
+  "results/DE/tier3_DE/figures",
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+# --------------------------------------------------
+# Main category distribution
+# --------------------------------------------------
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_category_distribution.png",
+  plot = p_categories,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_category_distribution.pdf",
+  plot = p_categories,
+  width = 8,
+  height = 6
+)
+
+# --------------------------------------------------
+# Rare inheritance categories
+# --------------------------------------------------
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_rare_categories.png",
+  plot = p_rare,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_rare_categories.pdf",
+  plot = p_rare,
+  width = 8,
+  height = 6
+)
+
+# --------------------------------------------------
+# Combined isoform-level Venn diagrams
+# --------------------------------------------------
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_isoform_overlap_venn.png",
+  plot = p_venn_isoforms,
+  width = 15,
+  height = 5,
+  dpi = 300
+)
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_isoform_overlap_venn.pdf",
+  plot = p_venn_isoforms,
+  width = 15,
+  height = 5
+)
+
+# --------------------------------------------------
+# Combined gene-level Venn diagrams
+# --------------------------------------------------
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_gene_overlap_venn.png",
+  plot = p_venn_genes,
+  width = 15,
+  height = 5,
+  dpi = 300
+)
+
+ggsave(
+  "results/DE/tier3_DE/figures/tier3_gene_overlap_venn.pdf",
+  plot = p_venn_genes,
+  width = 15,
+  height = 5
+)
+
+```
