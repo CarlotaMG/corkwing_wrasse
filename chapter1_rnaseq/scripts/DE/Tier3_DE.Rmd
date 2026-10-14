@@ -678,6 +678,98 @@ for (temp in c(12, 15, 18)) {
 knitr::kable(contrast_summary, caption = "Counts of DE isoforms per contrast and temperature")
 ```
 
+# Build isoform lists for Venn diagrams
+```{r build_isoform_venn_lists}
+
+mis_list <- list(
+  "12°C" = unique(
+    DE_all %>%
+      filter(
+        temperature == 12,
+        category %in% c(
+          "transgressive_up",
+          "transgressive_down",
+          "within_range_misexpressed"
+        )
+      ) %>%
+      pull(isoform)
+  ),
+
+  "15°C" = unique(
+    DE_all %>%
+      filter(
+        temperature == 15,
+        category %in% c(
+          "transgressive_up",
+          "transgressive_down",
+          "within_range_misexpressed"
+        )
+      ) %>%
+      pull(isoform)
+  ),
+
+  "18°C" = unique(
+    DE_all %>%
+      filter(
+        temperature == 18,
+        category %in% c(
+          "transgressive_up",
+          "transgressive_down",
+          "within_range_misexpressed"
+        )
+      ) %>%
+      pull(isoform)
+  )
+)
+
+pls_list <- list(
+  "12°C" = unique(
+    DE_all %>%
+      filter(temperature == 12,
+             category == "parent_like_S") %>%
+      pull(isoform)
+  ),
+
+  "15°C" = unique(
+    DE_all %>%
+      filter(temperature == 15,
+             category == "parent_like_S") %>%
+      pull(isoform)
+  ),
+
+  "18°C" = unique(
+    DE_all %>%
+      filter(temperature == 18,
+             category == "parent_like_S") %>%
+      pull(isoform)
+  )
+)
+
+plw_list <- list(
+  "12°C" = unique(
+    DE_all %>%
+      filter(temperature == 12,
+             category == "parent_like_W") %>%
+      pull(isoform)
+  ),
+
+  "15°C" = unique(
+    DE_all %>%
+      filter(temperature == 15,
+             category == "parent_like_W") %>%
+      pull(isoform)
+  ),
+
+  "18°C" = unique(
+    DE_all %>%
+      filter(temperature == 18,
+             category == "parent_like_W") %>%
+      pull(isoform)
+  )
+)
+
+```
+
 ## Isoform-level overlap across temperatures
 ```{r venn_isoforms_combined, fig.width=15, fig.height=5}
 
@@ -835,6 +927,28 @@ datatable(
   caption = "Annotation Coverage for Tier 3 Differential Expression Categories"
 )
 
+```
+
+# Build gene lists for Venn diagrams
+```{r build_gene_venn_lists}
+
+mis_genes <- list(
+  "12°C" = gene_lists$misexpressed_12C,
+  "15°C" = gene_lists$misexpressed_15C,
+  "18°C" = gene_lists$misexpressed_18C
+)
+
+pls_genes <- list(
+  "12°C" = gene_lists$parent_like_S_12C,
+  "15°C" = gene_lists$parent_like_S_15C,
+  "18°C" = gene_lists$parent_like_S_18C
+)
+
+plw_genes <- list(
+  "12°C" = gene_lists$parent_like_W_12C,
+  "15°C" = gene_lists$parent_like_W_15C,
+  "18°C" = gene_lists$parent_like_W_18C
+)
 ```
 
 
